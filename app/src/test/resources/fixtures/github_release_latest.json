@@ -1,0 +1,18 @@
+{
+  "html_url": "https://github.com/Maxic112/AnimeVostBR/releases/tag/v1.2.0",
+  "tag_name": "v1.2.0",
+  "name": "AnimeVostBR 1.2.0",
+  "draft": false,
+  "prerelease": false,
+  "published_at": "2026-11-02T13:15:35Z",
+  "assets": [
+    {
+      "name": "AnimeVostBR-v1.2.0.apk",
+      "content_type": "application/vnd.android.package-archive",
+      "state": "uploaded",
+      "size": 3773572,
+      "browser_download_url": "https://github.com/Maxic112/AnimeVostBR/releases/download/v1.2.0/AnimeVostBR-v1.2.0.apk"
+    }
+  ],
+  "body": "\n### Added\n- Site setting: auto (main site, then mirror), main site only, or mirror only.\n- Automatic discovery of the current site mirror (redirect from the old address, links on the\n  main site, RSS, next mirror numbers), on start, in the background and on demand.\n- Fallback data source: when the API is unavailable, the feed, title cards and episodes are loaded\n  from the site or its mirror.\n- \"Connection check\" screen with 12 checks covering the API, video and image hosts, site, mirror\n  and the fallback source.\n- `tools/api_check.py` for monitoring API availability and response format.\n\n### Changed\n- Network errors are explained in plain language.\n- Settings buttons are easier to reach with a TV remote.\n\n### Fixed\n- No empty rating or stale \"of N\" episode count for titles loaded from the site.\n\n"
+}

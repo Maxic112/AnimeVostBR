@@ -63,6 +63,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.offset
+import com.animevostbr.core.AppUpdate
 import com.animevostbr.core.Progress
 import com.animevostbr.core.Repo
 import com.animevostbr.core.Title
@@ -171,7 +173,14 @@ fun HomeScreen(
             }
             IconButton(modifier = Modifier.focusBorder(CircleShape), onClick = onSearch) { Icon(Icons.Filled.Search, contentDescription = "Поиск") }
             IconButton(modifier = Modifier.focusBorder(CircleShape), onClick = onFavorites) { Icon(Icons.Filled.FavoriteBorder, contentDescription = "Избранное") }
-            IconButton(modifier = Modifier.focusBorder(CircleShape), onClick = onSettings) { Icon(Icons.Filled.Settings, contentDescription = "Настройки") }
+            IconButton(modifier = Modifier.focusBorder(CircleShape), onClick = onSettings) {
+                Box {
+                    Icon(Icons.Filled.Settings, contentDescription = "Настройки")
+                    if (AppUpdate.available != null) {
+                        UpdateDot(Modifier.align(Alignment.TopEnd).offset(x = 3.dp, y = (-3).dp))
+                    }
+                }
+            }
         }
 
         TabRow(

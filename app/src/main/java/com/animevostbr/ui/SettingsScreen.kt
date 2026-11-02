@@ -42,13 +42,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.SystemUpdate
+import androidx.compose.ui.draw.clip
 import com.animevostbr.AnimeVostApp
+import com.animevostbr.core.AppUpdate
 import com.animevostbr.core.Quality
 import com.animevostbr.core.Repo
 import com.animevostbr.core.ThemeMode
 
 @Composable
-fun SettingsScreen(onBack: () -> Unit, onDiagnostics: () -> Unit) {
+fun SettingsScreen(onBack: () -> Unit, onDiagnostics: () -> Unit, onUpdate: () -> Unit) {
     val context = LocalContext.current
     var theme by remember { mutableStateOf(Repo.prefs.themeMode) }
     var quality by remember { mutableStateOf(Repo.prefs.defaultQuality) }
@@ -76,6 +80,35 @@ fun SettingsScreen(onBack: () -> Unit, onDiagnostics: () -> Unit) {
                 style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier.padding(start = 8.dp)
             )
+        }
+
+        val update = AppUpdate.available
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 12.dp)
+                .focusBorder(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(12.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .clickable(onClick = onUpdate)
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+        ) {
+            Icon(Icons.Filled.SystemUpdate, contentDescription = null)
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = 16.dp)
+            ) {
+                Text(text = "Обновление", style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    text = if (update != null) "Доступна версия ${update.version}" else "Версия $appVersion",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (update != null) UpdateOrange else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            if (update != null) UpdateDot(Modifier.padding(end = 8.dp))
+            Icon(Icons.Filled.ChevronRight, contentDescription = null)
         }
 
         SectionTitle(text = "Оформление", modifier = Modifier.padding(top = 16.dp))

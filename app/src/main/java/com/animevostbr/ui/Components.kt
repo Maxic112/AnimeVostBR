@@ -260,6 +260,18 @@ fun Modifier.focusBorder(shape: Shape = RoundedCornerShape(10.dp)): Modifier = c
         .then(if (focused) Modifier.border(3.dp, color, shape) else Modifier)
 }
 
+/** Marks the settings icon and the update entry while a new app version is available. */
+val UpdateOrange = Color(0xFFFF9800)
+
+@Composable
+fun UpdateDot(modifier: Modifier = Modifier) {
+    Box(
+        modifier
+            .size(10.dp)
+            .background(UpdateOrange, CircleShape)
+    )
+}
+
 @Composable
 fun SectionTitle(text: String, modifier: Modifier = Modifier) {
     Text(

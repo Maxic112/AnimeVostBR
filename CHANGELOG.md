@@ -4,6 +4,13 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/).
 
+## [1.3.0] - 2026-11-02
+
+### Added
+- In-app updates from GitHub Releases: Settings → Update checks for a new version, downloads it and
+  opens the system installer. The app checks once a day in the background.
+- Orange dot on the Settings icon and on the Update item when a new version is available.
+
 ## [1.2.0] - 2026-11-02
 
 ### Added

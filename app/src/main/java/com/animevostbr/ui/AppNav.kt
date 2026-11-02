@@ -8,11 +8,18 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import androidx.compose.ui.platform.LocalContext
+import com.animevostbr.core.AppUpdate
 import com.animevostbr.playback.PlayerViewModel
 
 @Composable
 fun AppNav(isTv: Boolean, openTitleId: Int?, onTitleOpened: () -> Unit) {
     val nav = rememberNavController()
+
+    val context = LocalContext.current
+    LaunchedEffect(Unit) {
+        if (AppUpdate.hasPendingInstall(context)) nav.navigate("update")
+    }
 
     LaunchedEffect(openTitleId) {
         if (openTitleId != null) {
@@ -51,8 +58,13 @@ fun AppNav(isTv: Boolean, openTitleId: Int?, onTitleOpened: () -> Unit) {
         composable("settings") {
             SettingsScreen(
                 onBack = { nav.popBackStack() },
-                onDiagnostics = { nav.navigate("diagnostics") }
+                onDiagnostics = { nav.navigate("diagnostics") },
+                onUpdate = { nav.navigate("update") }
             )
+        }
+
+        composable("update") {
+            UpdateScreen(onBack = { nav.popBackStack() })
         }
 
         composable("diagnostics") {

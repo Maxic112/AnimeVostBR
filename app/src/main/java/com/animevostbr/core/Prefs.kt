@@ -57,6 +57,20 @@ class Prefs(context: Context) {
         get() = sp.getString("mirror_source", "").orEmpty()
         set(v) = sp.edit().putString("mirror_source", v).apply()
 
+    /** Raw GitHub response of the last release check, parsed by [AppUpdate.parseRelease]. */
+    var latestRelease: String?
+        get() = sp.getString("latest_release", null)
+        set(v) = sp.edit().putString("latest_release", v).apply()
+
+    var updateCheckedAt: Long
+        get() = sp.getLong("update_checked_at", 0L)
+        set(v) = sp.edit().putLong("update_checked_at", v).apply()
+
+    /** When the user was sent to grant the install permission; see [AppUpdate.hasPendingInstall]. */
+    var installRequestedAt: Long
+        get() = sp.getLong("install_requested_at", 0L)
+        set(v) = sp.edit().putLong("install_requested_at", v).apply()
+
     var notificationsEnabled: Boolean
         get() = sp.getBoolean("notif_enabled", true)
         set(v) = sp.edit().putBoolean("notif_enabled", v).apply()
