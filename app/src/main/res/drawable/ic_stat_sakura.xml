@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Small notification icon: sakura silhouette -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group android:pivotX="54" android:pivotY="54" android:rotation="0">
+        <path android:fillColor="#FFFFFFFF"
+            android:pathData="M54,54 C46.5,48.5 42.5,40.5 45.5,32.5 Q48.5,29.5 51.5,32 L54,34 L56.5,32 Q59.5,29.5 62.5,32.5 C65.5,40.5 61.5,48.5 54,54 Z" />
+    </group>
+    <group android:pivotX="54" android:pivotY="54" android:rotation="72">
+        <path android:fillColor="#FFFFFFFF"
+            android:pathData="M54,54 C46.5,48.5 42.5,40.5 45.5,32.5 Q48.5,29.5 51.5,32 L54,34 L56.5,32 Q59.5,29.5 62.5,32.5 C65.5,40.5 61.5,48.5 54,54 Z" />
+    </group>
+    <group android:pivotX="54" android:pivotY="54" android:rotation="144">
+        <path android:fillColor="#FFFFFFFF"
+            android:pathData="M54,54 C46.5,48.5 42.5,40.5 45.5,32.5 Q48.5,29.5 51.5,32 L54,34 L56.5,32 Q59.5,29.5 62.5,32.5 C65.5,40.5 61.5,48.5 54,54 Z" />
+    </group>
+    <group android:pivotX="54" android:pivotY="54" android:rotation="216">
+        <path android:fillColor="#FFFFFFFF"
+            android:pathData="M54,54 C46.5,48.5 42.5,40.5 45.5,32.5 Q48.5,29.5 51.5,32 L54,34 L56.5,32 Q59.5,29.5 62.5,32.5 C65.5,40.5 61.5,48.5 54,54 Z" />
+    </group>
+    <group android:pivotX="54" android:pivotY="54" android:rotation="288">
+        <path android:fillColor="#FFFFFFFF"
+            android:pathData="M54,54 C46.5,48.5 42.5,40.5 45.5,32.5 Q48.5,29.5 51.5,32 L54,34 L56.5,32 Q59.5,29.5 62.5,32.5 C65.5,40.5 61.5,48.5 54,54 Z" />
+    </group>
+</vector>

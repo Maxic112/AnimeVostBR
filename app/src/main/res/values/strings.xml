@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AnimeVostBR</string>
+    <string name="notif_channel_updates">Новые серии</string>
+    <string name="notif_channel_updates_desc">Уведомления о выходе новых серий</string>
+</resources>

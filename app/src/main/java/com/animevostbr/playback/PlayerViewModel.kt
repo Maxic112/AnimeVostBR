@@ -1,0 +1,198 @@
+package com.animevostbr.playback
+
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.viewModelScope
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.media3.common.AudioAttributes
+import androidx.media3.common.C
+import androidx.media3.common.MediaItem
+import androidx.media3.common.MimeTypes
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
+import androidx.media3.exoplayer.ExoPlayer
+import com.animevostbr.core.PlaylistItem
+import com.animevostbr.core.Progress
+import com.animevostbr.core.Quality
+import com.animevostbr.core.Repo
+import com.animevostbr.core.TitleLite
+import kotlinx.coroutines.launch
+
+/**
+  * Owns the ExoPlayer instance, the episode list, quality and watch progress.
+  */
+class PlayerViewModel(
+    app: Application,
+    savedState: SavedStateHandle
+) : AndroidViewModel(app) {
+
+    private val titleId: Int = savedState["id"] ?: -1
+    private val startEp: Int = savedState["ep"] ?: 1
+
+    var items by mutableStateOf<List<PlaylistItem>>(emptyList())
+        private set
+    var currentEp by mutableStateOf(startEp)
+        private set
+    var quality by mutableStateOf(Repo.prefs.defaultQuality)
+        private set
+    var error by mutableStateOf<String?>(null)
+        private set
+    var hasNext by mutableStateOf(false)
+        private set
+    var hasPrev by mutableStateOf(false)
+        private set
+    /** Short message over the video, e.g. that HD was replaced with SD. */
+    var notice by mutableStateOf<String?>(null)
+        private set
+
+    /** The other quality was already tried for the current episode after an error. */
+    private var fallbackTried = false
+
+    /**
+      * Quality forced by a playback error. Old titles often lack HD for every episode,
+      * so do not wait for the error again on each next one.
+      */
+    private var qualityOverride: Quality? = null
+
+    private var resumeMs: Long =
+        Repo.progress(titleId)?.takeIf { it.episode == startEp && it.positionMs > 0 }?.positionMs ?: 0L
+
+    val player: ExoPlayer = ExoPlayer.Builder(app).build().apply {
+        setAudioAttributes(
+            AudioAttributes.Builder()
+                .setUsage(C.USAGE_MEDIA)
+                .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
+                .build(),
+            true
+        )
+        playWhenReady = true
+    }
+
+    init {
+        player.addListener(object : Player.Listener {
+            override fun onPlayerError(e: PlaybackException) = onPlaybackFailed()
+        })
+        viewModelScope.launch {
+            items = Repo.playlist(titleId)
+            if (items.isEmpty()) {
+                error = "Не удалось загрузить серии.\nПроверьте подключение к интернету."
+            } else {
+                // a stale progress record may point past the end of the playlist
+                playEpisode(startEp.coerceIn(1, items.size))
+            }
+        }
+    }
+
+    /** `ep` is the 1-based playlist position. */
+    fun itemFor(ep: Int): PlaylistItem? = items.getOrNull(ep - 1)
+
+    val currentLabel: String get() = itemFor(currentEp)?.label ?: "Серия $currentEp"
+
+    fun playEpisode(ep: Int) {
+        val item = itemFor(ep) ?: return
+        quality = qualityOverride ?: Repo.prefs.defaultQuality
+        fallbackTried = false
+        val url = item.url(quality) ?: run {
+            error = "Нет видеопотока: ${item.label}"
+            return
+        }
+        currentEp = item.index
+        error = null
+        hasNext = itemFor(item.index + 1) != null
+        hasPrev = itemFor(item.index - 1) != null
+        startPlayback(url, if (item.index == startEp && resumeMs > 0) resumeMs else 0L)
+    }
+
+    private fun startPlayback(url: String, startMs: Long) {
+        val mediaItem = MediaItem.Builder().setUri(url).apply {
+            when {
+                url.contains("m3u8", ignoreCase = true) -> setMimeType(MimeTypes.APPLICATION_M3U8)
+                url.contains(".mpd", ignoreCase = true) -> setMimeType(MimeTypes.APPLICATION_MPD)
+            }
+        }.build()
+
+        player.setMediaItem(mediaItem, startMs)
+        player.prepare()
+        player.play()
+    }
+
+    /**
+      * Playback error. Some episodes exist in one quality only (e.g. HD returns 404 for
+      * old episodes) — then try the other one.
+      */
+    private fun onPlaybackFailed() {
+        val item = itemFor(currentEp)
+        val other = if (quality == Quality.HD) Quality.SD else Quality.HD
+        val otherUrl = item?.url(other)
+        if (item != null && !fallbackTried && otherUrl != null && otherUrl != item.url(quality)) {
+            fallbackTried = true
+            notice = "${quality.label} недоступно для этой серии — включено ${other.label}"
+            quality = other
+            qualityOverride = other
+            startPlayback(otherUrl, player.currentPosition.coerceAtLeast(0L))
+        } else {
+            error = "Не удалось воспроизвести: ${item?.label ?: "серия"}.\nВидеофайл недоступен на сервере."
+        }
+    }
+
+    fun clearNotice() {
+        notice = null
+    }
+
+    fun next() {
+        val nextEp = currentEp + 1
+        if (itemFor(nextEp) != null) {
+            resumeMs = 0L
+            playEpisode(nextEp)
+        }
+    }
+
+    fun prev() {
+        val prevEp = currentEp - 1
+        if (itemFor(prevEp) != null) {
+            resumeMs = 0L
+            playEpisode(prevEp)
+        }
+    }
+
+    fun toggleQuality() {
+        quality = if (quality == Quality.HD) Quality.SD else Quality.HD
+        Repo.prefs.defaultQuality = quality
+        qualityOverride = null // the user picked a quality explicitly
+        val resume = player.currentPosition
+        playEpisode(currentEp)
+        if (resume > 0) player.seekTo(resume)
+    }
+
+    fun saveProgress() {
+        if (titleId <= 0) return
+        val dur = player.contentDuration
+        if (dur <= 0) return
+
+        // the repo cache also knows titles opened from search, not only from the feed
+        val lite: TitleLite = Repo.cachedTitle(titleId)?.toLite()
+            ?: Repo.lastCached.firstOrNull { it.id == titleId }?.toLite()
+            ?: Repo.favorites().firstOrNull { it.id == titleId }
+            ?: Repo.progress(titleId)?.lite
+            ?: TitleLite(titleId, "", "")
+
+        val pos = player.currentPosition.coerceIn(0, dur)
+        // less than 30 s left counts as watched,
+        // so the next visit starts the following episode from the beginning
+        val label = itemFor(currentEp)?.label
+        if (dur - pos < 30_000) {
+            Repo.saveProgress(Progress(lite, currentEp, 0L, dur, label))
+        } else {
+            Repo.saveProgress(Progress(lite, currentEp, pos, dur, label))
+        }
+    }
+
+    override fun onCleared() {
+        saveProgress()
+        player.release()
+        super.onCleared()
+    }
+}

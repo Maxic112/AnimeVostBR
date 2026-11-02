@@ -1,0 +1,105 @@
+# ---------------------------------------------------------------------------
+# Android / Gradle
+# ---------------------------------------------------------------------------
+.gradle/
+build/
+/app/build/
+/captures/
+.externalNativeBuild/
+.cxx/
+.kotlin/
+*.apk
+*.aab
+*.ap_
+*.dex
+*.idsig
+output-metadata.json
+/app/release/
+/app/debug/
+
+# Local SDK path and machine-specific Gradle settings
+local.properties
+
+# Profiling / lint reports
+*.hprof
+lint-results*.html
+lint-results*.xml
+
+# ---------------------------------------------------------------------------
+# Signing keys and secrets — never commit
+# ---------------------------------------------------------------------------
+/keystore/
+*.jks
+*.keystore
+*.p12
+*.pk8
+*.pem
+*.key
+keystore.properties
+signing.properties
+google-services.json
+.env
+.env.*
+
+# ---------------------------------------------------------------------------
+# IDEs and editors
+# ---------------------------------------------------------------------------
+# JetBrains (Android Studio, IntelliJ IDEA, Fleet)
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+.fleet/
+# Visual Studio Code
+.vscode/
+*.code-workspace
+.history/
+# Eclipse / Buildship
+.project
+.classpath
+.settings/
+.metadata/
+bin/
+# NetBeans
+nbproject/
+nbbuild/
+nbdist/
+.nb-gradle/
+# Vim / Emacs / Sublime
+*.swp
+*.swo
+*~
+\#*\#
+.\#*
+*.sublime-project
+*.sublime-workspace
+
+# ---------------------------------------------------------------------------
+# Operating systems
+# ---------------------------------------------------------------------------
+.DS_Store
+.AppleDouble
+._*
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ---------------------------------------------------------------------------
+# Python tooling (tools/*.py)
+# ---------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# ---------------------------------------------------------------------------
+# Project specific
+# ---------------------------------------------------------------------------
+# Local-only material: research notes, raw API dumps, test builds, generated PDFs
+/local/
+# API health-check logs (tools/api_check.py)
+/logs/
+# Generated documents
+*.pdf
