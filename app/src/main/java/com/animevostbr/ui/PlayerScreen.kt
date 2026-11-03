@@ -32,7 +32,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -55,8 +54,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.material.icons.filled.AspectRatio
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.media3.common.Player
+import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
+import com.animevostbr.core.Repo
 import com.animevostbr.playback.PlayerViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -98,6 +102,18 @@ fun PlayerScreen(vm: PlayerViewModel, onBack: () -> Unit) {
     val retryFocus = remember { FocusRequester() }
     var topBarFocused by remember { mutableStateOf(false) }
     var wantTopBarFocus by remember { mutableStateOf(false) }
+
+    // Picture mode: pinch on phones, top bar button everywhere; kept between episodes and sessions
+    var resizeMode by remember { mutableStateOf(PictureMode.of(Repo.prefs.videoResizeMode)) }
+    fun applyMode(mode: PictureMode) {
+        if (mode != resizeMode) {
+            resizeMode = mode
+            Repo.prefs.videoResizeMode = mode.resizeMode
+        }
+        vm.showNotice(mode.hint)
+    }
+    LaunchedEffect(resizeMode, playerView) { playerView?.resizeMode = resizeMode.resizeMode }
+    val wideBar = LocalConfiguration.current.screenWidthDp >= 600
 
     LaunchedEffect(Unit) { if (isTv) runCatching { surfaceFocus.requestFocus() } }
     // Up shows the bar; focus it only once it is on screen
@@ -192,10 +208,14 @@ fun PlayerScreen(vm: PlayerViewModel, onBack: () -> Unit) {
         )
         AndroidView(
             factory = { ctx ->
-                GesturePlayerView(ctx) { dir, totalMs ->
-                    seekHint = dir to totalMs
-                    seekHintTick++
-                }.apply {
+                GesturePlayerView(
+                    ctx,
+                    onSeekStep = { dir, totalMs ->
+                        seekHint = dir to totalMs
+                        seekHintTick++
+                    },
+                    onPinch = { zoomIn -> applyMode(if (zoomIn) PictureMode.ZOOM else PictureMode.FIT) }
+                ).apply {
                     useController = true
                     setShowNextButton(false)
                     setShowPreviousButton(false)
@@ -268,11 +288,18 @@ fun PlayerScreen(vm: PlayerViewModel, onBack: () -> Unit) {
                 Text(
                     text = vm.currentLabel,
                     color = Color.White,
-                    style = MaterialTheme.typography.titleMedium
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
                 )
-                Spacer(Modifier.weight(1f))
                 TextButton(modifier = Modifier.focusBorder(), onClick = { if (vm.hasPrev) vm.prev() }, enabled = vm.hasPrev) {
                     Icon(Icons.Filled.SkipPrevious, contentDescription = "Предыдущая серия", tint = Color.White)
+                }
+                TextButton(modifier = Modifier.focusBorder(), onClick = { applyMode(resizeMode.next()) }) {
+                    Icon(Icons.Filled.AspectRatio, contentDescription = "Формат: ${resizeMode.label}", tint = Color.White)
+                    // icon only in portrait: the bar has no room for the label next to the title
+                    if (wideBar) Text(resizeMode.label, color = Color.White, modifier = Modifier.padding(start = 6.dp))
                 }
                 TextButton(modifier = Modifier.focusBorder(), onClick = { vm.toggleQuality() }) {
                     Text("Качество: ${vm.quality.label}", color = Color.White)
@@ -310,6 +337,19 @@ fun PlayerScreen(vm: PlayerViewModel, onBack: () -> Unit) {
                 }
             }
         }
+    }
+}
+
+/** How the video fills the screen when its aspect ratio differs from the display. */
+private enum class PictureMode(val resizeMode: Int, val label: String, val hint: String) {
+    FIT(AspectRatioFrameLayout.RESIZE_MODE_FIT, "Исходный", "Исходный формат"),
+    ZOOM(AspectRatioFrameLayout.RESIZE_MODE_ZOOM, "Заполнить", "Заполнить экран — края кадра обрезаны"),
+    FILL(AspectRatioFrameLayout.RESIZE_MODE_FILL, "Растянуть", "Растянуть на весь экран");
+
+    fun next(): PictureMode = entries[(ordinal + 1) % entries.size]
+
+    companion object {
+        fun of(resizeMode: Int): PictureMode = entries.firstOrNull { it.resizeMode == resizeMode } ?: FIT
     }
 }
 

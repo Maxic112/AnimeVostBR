@@ -4,6 +4,16 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/).
 
+## [1.4.0] - 2026-11-03
+
+### Added
+- Picture format in the player: pinch out to fill the screen and pinch in to restore the original
+  size on phones; a format button in the player bar cycles Original, Fill (crop) and Stretch, also
+  with a TV remote. The chosen format is remembered.
+
+### Changed
+- A long episode name in the player bar is shortened instead of pushing the buttons off screen.
+
 ## [1.3.0] - 2026-11-02
 
 ### Added

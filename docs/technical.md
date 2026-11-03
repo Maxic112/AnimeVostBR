@@ -39,7 +39,7 @@ app/
     AnimeVostApp.kt        Application: канал уведомлений, WorkManager, проверка зеркала
     MainActivity.kt        определение TV, тема, переход из уведомления
     core/                  данные: API, парсеры, сайт и зеркало, репозиторий, настройки, диагностика
-    playback/              PlayerViewModel (ExoPlayer), GesturePlayerView (двойной тап)
+    playback/              PlayerViewModel (ExoPlayer), GesturePlayerView (двойной тап, щипок)
     notify/                UpdateWorker — новые серии избранного, AppUpdateWorker — новая версия приложения
     ui/                    экраны Compose, навигация, тема, общие компоненты
   src/test/                JVM-тесты парсеров и эталонные ответы (resources/fixtures)
@@ -59,7 +59,7 @@ tools/                     build_release.sh, api_check.py, make_icon.py
 | Хранение | `core/Prefs.kt` | настройки, избранное, прогресс, счётчики серий (SharedPreferences + Gson) |
 | Диагностика | `core/Diagnostics.kt` | проверки для экрана «Проверка соединения» |
 | Обновление | `core/AppUpdate.kt` | проверка GitHub Releases, загрузка и проверка APK, запуск установщика |
-| Плеер | `playback/*` | ExoPlayer, выбор качества, авто-SD при ошибке, сохранение прогресса, жесты |
+| Плеер | `playback/*` | ExoPlayer, выбор качества, авто-SD при ошибке, сохранение прогресса, жесты (двойной тап, щипок — формат картинки) |
 | Фон | `notify/UpdateWorker.kt`, `notify/AppUpdateWorker.kt` | новые серии и обновление зеркала; ежедневная проверка версии приложения |
 | UI | `ui/*` | главная (вкладки, сетка, обновление), поиск, детали, плеер, избранное, настройки, диагностика, обновление приложения |
 
@@ -129,6 +129,7 @@ API не зависит от сайта. Сайт (`animevost.org` и зерка
 | `quality` | `HD` / `SD` |
 | `grid_columns` | 0 — авто, 2…5 — плиток в ряд |
 | `episode_thumbs` | список серий с превью |
+| `video_resize_mode` | формат картинки в плеере: `RESIZE_MODE_FIT` (0), `FILL` (3) или `ZOOM` (4) из `AspectRatioFrameLayout` |
 | `notif_enabled` | уведомления включены |
 | `site_mode` | 0 — авто, 1 — основной сайт, 2 — зеркало |
 | `mirror_host`, `mirror_checked_at`, `mirror_source` | текущее зеркало, время проверки, где найдено |

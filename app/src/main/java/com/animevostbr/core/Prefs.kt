@@ -34,6 +34,11 @@ class Prefs(context: Context) {
         get() = sp.getInt("grid_columns", 0)
         set(v) = sp.edit().putInt("grid_columns", v).apply()
 
+    /** Player picture mode: AspectRatioFrameLayout.RESIZE_MODE_FIT (0), FILL (3) or ZOOM (4). */
+    var videoResizeMode: Int
+        get() = sp.getInt("video_resize_mode", 0)
+        set(v) = sp.edit().putInt("video_resize_mode", v).apply()
+
     var episodeThumbs: Boolean
         get() = sp.getBoolean("episode_thumbs", false)
         set(v) = sp.edit().putBoolean("episode_thumbs", v).apply()

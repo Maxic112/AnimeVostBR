@@ -138,6 +138,10 @@ class PlayerViewModel(
         }
     }
 
+    fun showNotice(text: String) {
+        notice = text
+    }
+
     fun clearNotice() {
         notice = null
     }
