@@ -53,13 +53,23 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.unit.dp
+import com.animevostbr.core.Catalog
+import com.animevostbr.core.CatalogFilter
 import com.animevostbr.core.Repo
 
 @Composable
 fun SearchScreen(
     isTv: Boolean,
     onOpen: (Int) -> Unit,
+    onPlay: (id: Int, episode: Int) -> Unit,
+    onCatalog: (CatalogFilter) -> Unit,
     onBack: () -> Unit
 ) {
     var query by rememberSaveable { mutableStateOf("") }
@@ -72,8 +82,17 @@ fun SearchScreen(
         submitted = query.trim()
         keyboard?.hide()
     }
-    // Focus the field right away, otherwise phones need an extra tap
-    LaunchedEffect(Unit) { if (submitted == null) focusRequester.requestFocus() }
+    // Phones: focus the field right away, otherwise they need an extra tap. TV: start on the
+    // catalog — the on-screen keyboard would cover it; Up reaches the field.
+    // Only on the first visit: coming back from a genre must not pop the keyboard up again.
+    val catalogFocus = remember { FocusRequester() }
+    var initialFocusDone by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        if (submitted == null && !initialFocusDone) {
+            runCatching { if (isTv) catalogFocus.requestFocus() else focusRequester.requestFocus() }
+        }
+        initialFocusDone = true
+    }
 
     // Debounced suggestions (350 ms) so the API is not hit on every keystroke
     var suggestions by remember { mutableStateOf<List<Title>>(emptyList()) }
@@ -139,13 +158,8 @@ fun SearchScreen(
                     SuggestionRow(title = t, onClick = { onOpen(t.id) })
                 }
             }
-            submitted == null -> Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center) {
-                Text(
-                    text = "Введите название аниме\nи нажмите поиск",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            // nothing searched yet or the field was cleared: offer the catalog
+            submitted.isNullOrEmpty() || query.isBlank() -> CatalogBrowser(firstFocus = catalogFocus, onCatalog = onCatalog)
             results == null -> LoadingBox(message = "Ищем…")
             results!!.isEmpty() -> ErrorBox(
                 message = "По запросу «$submitted» ничего не найдено.",
@@ -160,21 +174,55 @@ fun SearchScreen(
                     .padding(top = 12.dp)
             ) {
                 items(results!!, key = { it.id }) { t ->
-                    var favTick by remember(t.id) { mutableStateOf(0) }
-                    val isFav = remember(favTick) { Repo.isFavorite(t.id) }
-                    PosterCard(
-                        title = t,
-                        isTv = isTv,
-                        isFavorite = isFav,
-                        onClick = { onOpen(t.id) },
-                        onLongClick = {
-                            Repo.toggleFavorite(t.toLite())
-                            favTick++
-                        }
+                    TitleItem(title = t, isTv = isTv, onOpen = onOpen, onPlay = onPlay)
+                }
+            }
+        }
+    }
+}
+
+/** Shown while the query is empty: browse by genre, type and year, like the site menu. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun CatalogBrowser(firstFocus: FocusRequester, onCatalog: (CatalogFilter) -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(top = 12.dp)
+    ) {
+        Text(
+            text = "Введите название или выберите жанр, тип или год",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 4.dp)
+        )
+        for ((section, filters) in listOf(
+            "Жанры" to Catalog.genres,
+            "Тип" to Catalog.types,
+            "Год" to Catalog.years
+        )) {
+            SectionTitle(text = section, modifier = Modifier.padding(top = 16.dp, bottom = 6.dp))
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                for (f in filters) {
+                    Text(
+                        text = f.name,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier
+                            .then(if (f == Catalog.genres.first()) Modifier.focusRequester(firstFocus) else Modifier)
+                            .clip(RoundedCornerShape(50))
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .focusBorder(RoundedCornerShape(50))
+                            .clickable { onCatalog(f) }
+                            .padding(horizontal = 14.dp, vertical = 8.dp)
                     )
                 }
             }
         }
+        Spacer(Modifier.height(24.dp))
     }
 }
 

@@ -235,10 +235,11 @@ fun ErrorBox(message: String, onRetry: (() -> Unit)?) {
     }
 }
 
-/** Feed/search columns from settings; defaults to 3 on phones and by width on TV. */
+/** Feed/search columns from settings; defaults to 3 on phones and by width on TV. The list layout is one column. */
 fun feedGridCells(isTv: Boolean): GridCells {
     val n = Repo.prefs.gridColumns
     return when {
+        Repo.prefs.listLayout -> GridCells.Fixed(1)
         n > 0 -> GridCells.Fixed(n)
         isTv -> GridCells.Adaptive(170.dp)
         else -> GridCells.Fixed(3)

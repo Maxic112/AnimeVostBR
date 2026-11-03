@@ -34,6 +34,16 @@ class Prefs(context: Context) {
         get() = sp.getInt("grid_columns", 0)
         set(v) = sp.edit().putInt("grid_columns", v).apply()
 
+    /** Feed, search and catalog as poster tiles (false) or a list with details (true). */
+    var listLayout: Boolean
+        get() = sp.getBoolean("list_layout", false)
+        set(v) = sp.edit().putBoolean("list_layout", v).apply()
+
+    /** Poster size in the list layout: 0 = auto (smaller on phones, larger on TV), 1…5. */
+    var listPosterSize: Int
+        get() = sp.getInt("list_poster_size", 0)
+        set(v) = sp.edit().putInt("list_poster_size", v).apply()
+
     /** Player picture mode: AspectRatioFrameLayout.RESIZE_MODE_FIT (0), FILL (3) or ZOOM (4). */
     var videoResizeMode: Int
         get() = sp.getInt("video_resize_mode", 0)

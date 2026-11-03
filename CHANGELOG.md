@@ -4,6 +4,21 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/).
 
+## [1.5.0] - 2026-11-03
+
+### Added
+- Browse by genre, type and year: while the search field is empty, Search shows 27 genres, 7 types
+  and release years; each opens a listing from the site with infinite scroll.
+- List layout for the feed, search and catalog listings: poster with title, year, type, episode
+  count, genres, rating and description, plus Watch/Continue and favorite buttons. Poster size: auto
+  or 1–5; smaller sizes show less text.
+
+### Changed
+- The episode-list setting is renamed to "Episodes on the title page" with a hint, so it is not
+  mistaken for the feed layout.
+- On TV, Search opens with focus on the genres instead of the on-screen keyboard; returning from a
+  listing no longer pops the keyboard up on phones.
+
 ## [1.4.0] - 2026-11-03
 
 ### Added

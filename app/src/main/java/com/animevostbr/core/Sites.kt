@@ -73,10 +73,13 @@ object Sites {
     fun get(url: String): String {
         val request = Request.Builder().url(url).header("User-Agent", ApiClient.UA).build()
         http.newCall(request).execute().use { r ->
-            if (!r.isSuccessful) throw IOException("HTTP ${r.code}")
+            if (!r.isSuccessful) throw HttpStatusException(r.code)
             return r.body?.string().orEmpty()
         }
     }
+
+    /** Non-2xx answer; catalog listings use 404 to mark the page after the last one. */
+    class HttpStatusException(val code: Int) : IOException("HTTP $code")
 
 
     data class MirrorCheck(

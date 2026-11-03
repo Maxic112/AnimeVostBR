@@ -110,3 +110,17 @@
 
 **Поиск** — `/index.php?do=search&subaction=search&search_start=<страница>&story=<запрос>`
 (полнотекстовый поиск DLE, используется, когда поиск API ничего не нашёл).
+
+**Выборки каталога** — та же разметка `article.post`, что у ленты, по 10 тайтлов на странице:
+
+| Путь | Значения |
+|---|---|
+| `/zhanr/<slug>/` | 27 жанров: `drama`, `komediya`, `boyevyye-iskusstva`, `fentezi`, … (полный список — `core/Catalog.kt`) |
+| `/tip/<slug>/` | `tv`, `tv-speshl`, `ova`, `ona`, `polnometrazhnyy-film`, `korotkometrazhnyy-film`, `dunkhua` |
+| `/god/<год>/` | 1971 … текущий год (до 1991 — только отдельные годы) |
+
+Следующие страницы — `<путь>page/N/`; страница после последней отвечает **404**.
+
+> Разметка `article.post` — мобильная тема сайта. Её сайт отдаёт на User-Agent приложения
+> (`AnimeVostBR/… (Android; client)`); с браузерным User-Agent приходит десктопная тема
+> (`div.shortstory`), которую парсер не разбирает.

@@ -34,6 +34,12 @@ object SiteSource {
         return base to parseFeed(html, base)
     }
 
+    /** Catalog listing page ([CatalogFilter.path], 10 titles each); past the last page the site answers 404. */
+    fun listing(path: String, page: Int): List<Title> {
+        val (base, html) = Sites.fetch(if (page <= 1) path else "${path}page/$page/")
+        return parseFeed(html, base)
+    }
+
     fun title(id: Int): Title? {
         val (base, html) = titlePage(id)
         return parseTitle(html, base, id)

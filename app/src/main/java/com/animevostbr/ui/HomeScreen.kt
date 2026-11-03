@@ -74,6 +74,7 @@ import com.animevostbr.core.Title
 fun HomeScreen(
     isTv: Boolean,
     onOpen: (Int) -> Unit,
+    onPlay: (id: Int, episode: Int) -> Unit,
     onSearch: () -> Unit,
     onFavorites: () -> Unit,
     onSettings: () -> Unit
@@ -223,7 +224,8 @@ fun HomeScreen(
                         onFocusRestored = { restoreFocus = false },
                         onFocused = { focusedId = it },
                         onRetry = { refresh++ },
-                        onOpen = onOpen
+                        onOpen = onOpen,
+                        onPlay = onPlay
                     )
                     if (pullState.progress > 0f || pullState.isRefreshing) PullToRefreshContainer(
                         state = pullState,
@@ -259,7 +261,8 @@ private fun FeedPage(
     onFocusRestored: () -> Unit,
     onFocused: (Int) -> Unit,
     onRetry: () -> Unit,
-    onOpen: (Int) -> Unit
+    onOpen: (Int) -> Unit,
+    onPlay: (id: Int, episode: Int) -> Unit
 ) {
     when {
         failed -> ErrorBox(
@@ -287,8 +290,6 @@ private fun FeedPage(
             modifier = Modifier.fillMaxSize()
         ) {
             items(list, key = { it.id }) { t ->
-                var favTick by remember(t.id) { mutableStateOf(0) }
-                val isFav = remember(favTick) { Repo.isFavorite(t.id) }
                 val focusRequester = remember { FocusRequester() }
                 if (t.id == focusTargetId) {
                     LaunchedEffect(Unit) {
@@ -296,17 +297,13 @@ private fun FeedPage(
                         onFocusRestored()
                     }
                 }
-                PosterCard(
+                TitleItem(
                     title = t,
                     isTv = isTv,
-                    isFavorite = isFav,
                     modifier = Modifier.focusRequester(focusRequester),
                     onFocused = { onFocused(t.id) },
-                    onClick = { onOpen(t.id) },
-                    onLongClick = {
-                        Repo.toggleFavorite(t.toLite())
-                        favTick++
-                    }
+                    onOpen = onOpen,
+                    onPlay = onPlay
                 )
             }
         }

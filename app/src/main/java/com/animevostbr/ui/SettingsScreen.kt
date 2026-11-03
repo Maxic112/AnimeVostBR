@@ -59,6 +59,8 @@ fun SettingsScreen(onBack: () -> Unit, onDiagnostics: () -> Unit, onUpdate: () -
     var notifs by remember { mutableStateOf(Repo.prefs.notificationsEnabled) }
     val appVersion = remember { runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull().orEmpty() }
     var columns by remember { mutableStateOf(Repo.prefs.gridColumns) }
+    var listLayout by remember { mutableStateOf(Repo.prefs.listLayout) }
+    var posterSize by remember { mutableStateOf(Repo.prefs.listPosterSize) }
     var siteMode by remember { mutableStateOf(Sites.mode) }
     var mirror by remember { mutableStateOf(Sites.mirrorHost) }
     var mirrorInfo by remember { mutableStateOf(mirrorStatus()) }
@@ -202,25 +204,63 @@ fun SettingsScreen(onBack: () -> Unit, onDiagnostics: () -> Unit, onUpdate: () -
             ) { Text("Проверка соединения") }
         }
 
-        SectionTitle(text = "Плиток в ряд (лента и поиск)", modifier = Modifier.padding(top = 16.dp))
-        for ((value, label) in listOf(
-            0 to "Авто (3 на телефоне, по ширине экрана на TV)",
-            2 to "2 — крупные",
-            3 to "3",
-            4 to "4",
-            5 to "5 — мелкие"
-        )) {
-            SettingRadio(
-                label = label,
-                selected = columns == value,
-                onClick = {
-                    columns = value
-                    Repo.prefs.gridColumns = value
-                }
-            )
+        SectionTitle(text = "Вид ленты, поиска и каталога", modifier = Modifier.padding(top = 16.dp))
+        SettingRadio(
+            label = "Плитки — постеры сеткой",
+            selected = !listLayout,
+            onClick = { listLayout = false; Repo.prefs.listLayout = false }
+        )
+        SettingRadio(
+            label = "Список — постер, описание и кнопка «Смотреть»",
+            selected = listLayout,
+            onClick = { listLayout = true; Repo.prefs.listLayout = true }
+        )
+
+        if (!listLayout) {
+            SectionTitle(text = "Плиток в ряд", modifier = Modifier.padding(top = 16.dp))
+            for ((value, label) in listOf(
+                0 to "Авто (3 на телефоне, по ширине экрана на TV)",
+                2 to "2 — крупные",
+                3 to "3",
+                4 to "4",
+                5 to "5 — мелкие"
+            )) {
+                SettingRadio(
+                    label = label,
+                    selected = columns == value,
+                    onClick = {
+                        columns = value
+                        Repo.prefs.gridColumns = value
+                    }
+                )
+            }
+        } else {
+            SectionTitle(text = "Размер превью в списке", modifier = Modifier.padding(top = 16.dp))
+            for ((value, label) in listOf(
+                0 to "Авто (поменьше на телефоне, крупнее на TV)",
+                1 to "1 — самое маленькое",
+                2 to "2",
+                3 to "3",
+                4 to "4",
+                5 to "5 — самое крупное"
+            )) {
+                SettingRadio(
+                    label = label,
+                    selected = posterSize == value,
+                    onClick = {
+                        posterSize = value
+                        Repo.prefs.listPosterSize = value
+                    }
+                )
+            }
         }
 
-        SectionTitle(text = "Список серий", modifier = Modifier.padding(top = 16.dp))
+        SectionTitle(text = "Серии на странице тайтла", modifier = Modifier.padding(top = 16.dp))
+        Text(
+            text = "Как показывать список серий внутри тайтла. Вид ленты на главном экране — в разделе выше.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
         SettingRadio(
             label = "Названиями (компактно)",
             selected = !thumbs,

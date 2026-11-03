@@ -110,6 +110,17 @@ object Repo {
         fromApi.ifEmpty { runCatching { SiteSource.playlist(id) }.getOrDefault(emptyList()) }
     }
 
+    /** One page of a catalog listing; an empty list past the last page. Throws on network errors. */
+    suspend fun catalogPage(filter: CatalogFilter, page: Int): List<Title> = withContext(Dispatchers.IO) {
+        val list = try {
+            SiteSource.listing(filter.path, page)
+        } catch (e: Sites.HttpStatusException) {
+            if (e.code == 404) emptyList() else throw e
+        }
+        list.forEach { cache.putIfAbsent(it.id, it) }
+        list
+    }
+
     suspend fun search(query: String): List<Title> {
         val q = query.trim()
         if (q.isEmpty()) return emptyList()
