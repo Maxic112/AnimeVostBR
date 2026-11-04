@@ -274,6 +274,14 @@ fun SettingsScreen(onBack: () -> Unit, onDiagnostics: () -> Unit, onUpdate: () -
 
         SectionTitle(text = "Качество по умолчанию", modifier = Modifier.padding(top = 16.dp))
         SettingRadio(
+            label = "Full HD (если есть у серии, иначе HD)",
+            selected = quality == Quality.FHD,
+            onClick = {
+                quality = Quality.FHD
+                Repo.prefs.defaultQuality = Quality.FHD
+            }
+        )
+        SettingRadio(
             label = "HD (высокое)",
             selected = quality == Quality.HD,
             onClick = {

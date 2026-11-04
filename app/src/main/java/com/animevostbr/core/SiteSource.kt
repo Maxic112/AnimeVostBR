@@ -22,6 +22,8 @@ object SiteSource {
     private val DATA_RE = Regex("""var\s+data\s*=\s*\{([^}]*)\}""")
     private val PAIR_RE = Regex(""""([^"]+)"\s*:\s*"(\d+)"""")
     private val TIMER_RE = Regex("""parseInt\(\s*(\d{9,})\s*-""")
+    private val PLAYER_FILE_RE = Regex(""""file":"([^"]*)"""")
+    private val FHD_RE = Regex("""\[FHD[^\]]*]([^,\[]+)""")
 
     /** The title page serves both the card and the episodes, so keep it for a couple of minutes. */
     private val pageCache = ConcurrentHashMap<Int, Pair<Long, Pair<String, String>>>()
@@ -46,6 +48,22 @@ object SiteSource {
     }
 
     fun playlist(id: Int): List<PlaylistItem> = parsePlaylist(titlePage(id).second)
+
+    /** Full HD link from the site player; null when the episode has no such file. */
+    fun fullHd(videoId: String): String? = parseFullHd(Sites.fetch("/frame5.php?play=$videoId&old=1").second)
+
+    /**
+      * `"file":"[SD (480p)]<links>,[HD (720р)]<links>,[FHD (1080p)]<links>"`, links joined with " or ".
+      * The page also has a spare player glued from string pieces that always lists Full HD,
+      * even when the file is missing; [PLAYER_FILE_RE] stops at its first quote.
+      */
+    fun parseFullHd(html: String): String? =
+        PLAYER_FILE_RE.findAll(html)
+            .firstNotNullOfOrNull { FHD_RE.find(it.groupValues[1]) }
+            ?.groupValues?.get(1)
+            ?.split(" or ")
+            ?.map { it.trim() }
+            ?.firstOrNull { "/1080/" in it }
 
     private fun titlePage(id: Int): Pair<String, String> {
         pageCache[id]?.let { (at, page) -> if (System.currentTimeMillis() - at < PAGE_TTL_MS) return page }

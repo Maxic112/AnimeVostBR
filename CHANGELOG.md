@@ -4,6 +4,14 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/).
 
+## [1.6.0] - 2026-11-04
+
+### Added
+- Full HD (1080p) quality in Settings, on the title page and in the player. The link comes from the
+  site player, so it works through the mirror too. Episodes without Full HD play in HD with a notice,
+  and the next episode tries Full HD again.
+- Full HD check on the "Connection check" screen.
+
 ## [1.5.0] - 2026-11-03
 
 ### Added

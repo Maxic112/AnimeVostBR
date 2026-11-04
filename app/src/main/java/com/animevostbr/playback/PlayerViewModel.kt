@@ -19,6 +19,7 @@ import com.animevostbr.core.Progress
 import com.animevostbr.core.Quality
 import com.animevostbr.core.Repo
 import com.animevostbr.core.TitleLite
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 /**
@@ -57,6 +58,9 @@ class PlayerViewModel(
       */
     private var qualityOverride: Quality? = null
 
+    /** Full HD link request for the episode being opened. */
+    private var linkJob: Job? = null
+
     private var resumeMs: Long =
         Repo.progress(titleId)?.takeIf { it.episode == startEp && it.positionMs > 0 }?.positionMs ?: 0L
 
@@ -91,7 +95,7 @@ class PlayerViewModel(
 
     val currentLabel: String get() = itemFor(currentEp)?.label ?: "Серия $currentEp"
 
-    fun playEpisode(ep: Int) {
+    fun playEpisode(ep: Int, startMs: Long? = null) {
         val item = itemFor(ep) ?: return
         quality = qualityOverride ?: Repo.prefs.defaultQuality
         fallbackTried = false
@@ -103,7 +107,25 @@ class PlayerViewModel(
         error = null
         hasNext = itemFor(item.index + 1) != null
         hasPrev = itemFor(item.index - 1) != null
-        startPlayback(url, if (item.index == startEp && resumeMs > 0) resumeMs else 0L)
+        val start = startMs ?: if (item.index == startEp && resumeMs > 0) resumeMs else 0L
+        linkJob?.cancel()
+        if (quality == Quality.FHD) {
+            // not clearMediaItems(): an empty player reports STATE_ENDED, which skips to the next episode
+            player.stop()
+            linkJob = viewModelScope.launch {
+                val fullHd = Repo.fullHdUrl(item)
+                if (fullHd == null) replaceFullHd()
+                startPlayback(fullHd ?: url, start)
+            }
+        } else {
+            startPlayback(url, start)
+        }
+    }
+
+    /** Full HD is looked up per episode, so unlike [qualityOverride] this lasts for one episode only. */
+    private fun replaceFullHd() {
+        notice = "${Quality.FHD.label} недоступно для этой серии — включено ${Quality.HD.label}"
+        quality = Quality.HD
     }
 
     private fun startPlayback(url: String, startMs: Long) {
@@ -114,6 +136,8 @@ class PlayerViewModel(
             }
         }.build()
 
+        // a fresh decoder: some TV hardware decoders freeze when one instance changes resolution
+        player.stop()
         player.setMediaItem(mediaItem, startMs)
         player.prepare()
         player.play()
@@ -125,6 +149,12 @@ class PlayerViewModel(
       */
     private fun onPlaybackFailed() {
         val item = itemFor(currentEp)
+        val hdUrl = item?.url(Quality.HD)
+        if (quality == Quality.FHD && hdUrl != null) {
+            replaceFullHd()
+            startPlayback(hdUrl, player.currentPosition.coerceAtLeast(0L))
+            return
+        }
         val other = if (quality == Quality.HD) Quality.SD else Quality.HD
         val otherUrl = item?.url(other)
         if (item != null && !fallbackTried && otherUrl != null && otherUrl != item.url(quality)) {
@@ -163,16 +193,15 @@ class PlayerViewModel(
     }
 
     fun toggleQuality() {
-        quality = if (quality == Quality.HD) Quality.SD else Quality.HD
+        quality = quality.next()
         Repo.prefs.defaultQuality = quality
         qualityOverride = null // the user picked a quality explicitly
-        val resume = player.currentPosition
-        playEpisode(currentEp)
-        if (resume > 0) player.seekTo(resume)
+        playEpisode(currentEp, player.currentPosition.takeIf { it > 0 })
     }
 
     fun saveProgress() {
-        if (titleId <= 0) return
+        // the player still holds the previous episode while the link loads
+        if (titleId <= 0 || linkJob?.isActive == true) return
         val dur = player.contentDuration
         if (dur <= 0) return
 

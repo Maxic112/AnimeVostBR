@@ -6,7 +6,11 @@ import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import kotlin.math.roundToInt
 
-enum class Quality(val label: String) { HD("HD"), SD("SD") }
+enum class Quality(val label: String) {
+    FHD("Full HD"), HD("HD"), SD("SD");
+
+    fun next(): Quality = entries[(ordinal + 1) % entries.size]
+}
 
 /** Minimal title data persisted locally (favorites, progress). */
 data class TitleLite(
@@ -81,6 +85,7 @@ data class Progress(
 /**
   * `index` is the 1-based playlist position, `label` is the name sent by the server.
   * Either quality may be missing; [url] falls back to the other one.
+  * The playlist has no Full HD link: [Repo.fullHdUrl] asks the site, [url] gives HD for it.
   */
 data class PlaylistItem(
     val index: Int,
@@ -89,13 +94,16 @@ data class PlaylistItem(
     val sd: String?,
     val preview: String? = null
 ) {
+    val videoId: String? get() = VIDEO_ID.find(sd ?: hd.orEmpty())?.groupValues?.get(1)
+
     fun url(quality: Quality): String? = when (quality) {
-        Quality.HD -> hd ?: sd
+        Quality.FHD, Quality.HD -> hd ?: sd
         Quality.SD -> sd ?: hd
     }
 }
 
 // Patterns verified against real API and site responses
+private val VIDEO_ID = Regex("""/(\d+)\.mp4""")
 private val SERIES_PAIR = Regex("""['"]([^'"]+)['"]\s*:\s*['"](\d+)['"]""")
 private val PROGRESS = Regex("""\[(\d+)-(\d+) из (\d+)\+?]""")
 private val NEXT_EP = Regex("""\[(\d+) серия - ([^\]]+?)]""")

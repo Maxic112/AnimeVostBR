@@ -1,0 +1,20 @@
+<script>
+checka('https://host-a.example/vost.png?md5=TOKEN&time=1793803633&ts='+Date.now())
+    .then(function(imageBlob) {
+        if (imageBlob) {
+            mlink='https://sd-a.example/1000000001.mp4?md5=TOKEN&time=1793803633 or https://sd-b.example/1000000001.mp4?md5=TOKEN&time=1793803633';
+            window.player = new Playerjs({
+                "id":"player2",
+                "file":"[SD (480p)]https://sd-a.example/1000000001.mp4?md5=TOKEN&time=1793803633 or https://sd-b.example/1000000001.mp4?md5=TOKEN&time=1793803633,[HD (720р)]https://hd-a.example/720/1000000001.mp4?md5=TOKEN&time=1793803633,[FHD (1080p)]https://fhd-a.example/1080/1000000001.mp4?md5=TOKEN&time=1793803633 or https://hd-a.example/720/1000000001.mp4?md5=TOKEN&time=1793803633 or https://sd-a.example/1000000001.mp4?md5=TOKEN&time=1793803633",
+                "default_quality":"SD (480p)"
+            });
+        } else {
+            mlink="https://spare.example/1000000001.mp4?md5=TOKEN&time=1766707434";
+            window.player = new Playerjs({
+                "id":"player2",
+                "file":"[SD (480p)]"+mlink+",[HD (720р)]https://spare.example/720/1000000001.mp4?md5=TOKEN&time=1766707434,[FHD (1080p)]https://spare.example/1080/1000000001.mp4?md5=TOKEN&time=1766707434",
+                "default_quality":"SD (480p)"
+            });
+        }
+    });
+</script>

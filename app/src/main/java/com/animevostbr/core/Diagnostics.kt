@@ -75,6 +75,7 @@ object Diagnostics {
         // API is down: probe video and posters using links from the site fallback
         if (episode == null) episode = runCatching { SiteSource.playlist(id).firstOrNull() }.getOrNull()
         if (sample == null) sample = runCatching { SiteSource.feed(1).second.firstOrNull() }.getOrNull()
+        step("Видео Full HD") { probe(episode?.videoId?.let { SiteSource.fullHd(it) }) }
         step("Видео HD") { probe(episode?.hd) }
         step("Видео SD") { probe(episode?.sd) }
         step("Постеры") { probe(sample?.poster) }

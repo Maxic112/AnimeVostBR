@@ -110,6 +110,11 @@ object Repo {
         fromApi.ifEmpty { runCatching { SiteSource.playlist(id) }.getOrDefault(emptyList()) }
     }
 
+    /** Null when the episode has no Full HD or the site cannot be reached. */
+    suspend fun fullHdUrl(item: PlaylistItem): String? = withContext(Dispatchers.IO) {
+        item.videoId?.let { id -> runCatching { SiteSource.fullHd(id) }.getOrNull() }
+    }
+
     /** One page of a catalog listing; an empty list past the last page. Throws on network errors. */
     suspend fun catalogPage(filter: CatalogFilter, page: Int): List<Title> = withContext(Dispatchers.IO) {
         val list = try {

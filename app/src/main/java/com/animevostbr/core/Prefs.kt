@@ -26,8 +26,8 @@ class Prefs(context: Context) {
         set(v) = sp.edit().putInt("theme_mode", v).apply()
 
     var defaultQuality: Quality
-        get() = if (sp.getString("quality", "HD") == "SD") Quality.SD else Quality.HD
-        set(v) = sp.edit().putString("quality", v.label).apply()
+        get() = sp.getString("quality", null).let { saved -> Quality.entries.find { it.name == saved } } ?: Quality.HD
+        set(v) = sp.edit().putString("quality", v.name).apply()
 
     /** Tiles per row in feed and search; 0 = auto (3 on phones, by width on TV). */
     var gridColumns: Int
