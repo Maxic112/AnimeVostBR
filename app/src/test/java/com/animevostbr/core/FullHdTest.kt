@@ -12,16 +12,31 @@ class FullHdTest {
             .readText(Charsets.UTF_8)
 
     @Test
-    fun playerPage_givesFullHdLink() {
+    fun playerPage_givesLinksOfEveryQuality() {
+        val links = SiteSource.parsePlayerLinks(fixture("site_player_fhd.html"))
+        // the Full HD list also names 720p and 480p backups: only the 1080 file counts
+        assertEquals(listOf("https://fhd-a.example/1080/1000000001.mp4?md5=TOKEN&time=1793803633"), links[Quality.FHD])
+        assertEquals(listOf("https://hd-a.example/720/1000000001.mp4?md5=TOKEN&time=1793803633"), links[Quality.HD])
         assertEquals(
-            "https://fhd-a.example/1080/1000000001.mp4?md5=TOKEN&time=1793803633",
-            SiteSource.parseFullHd(fixture("site_player_fhd.html"))
+            listOf(
+                "https://sd-a.example/1000000001.mp4?md5=TOKEN&time=1793803633",
+                "https://sd-b.example/1000000001.mp4?md5=TOKEN&time=1793803633"
+            ),
+            links[Quality.SD]
         )
     }
 
     @Test
     fun spareTemplate_doesNotCount() {
-        assertNull(SiteSource.parseFullHd(fixture("site_player_no_fhd.html")))
+        val links = SiteSource.parsePlayerLinks(fixture("site_player_no_fhd.html"))
+        assertNull(links[Quality.FHD])
+        assertEquals(1, links[Quality.HD]?.size)
+    }
+
+    @Test
+    fun averageRating_isSumOverVotes() {
+        assertEquals(4.25, Title(id = 1, title = "t", ratingSum = 17, votes = 4).average, 0.001)
+        assertEquals(0.0, Title(id = 1, title = "t").average, 0.0)
     }
 
     @Test

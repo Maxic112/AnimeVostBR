@@ -22,6 +22,9 @@ import com.animevostbr.core.TitleLite
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
+/** Player page links are fetched again after this, so expired ones get replaced. */
+private const val PAGE_FRESH_MS = 5 * 60 * 1000L
+
 /**
   * Owns the ExoPlayer instance, the episode list, quality and watch progress.
   */
@@ -58,8 +61,19 @@ class PlayerViewModel(
       */
     private var qualityOverride: Quality? = null
 
-    /** Full HD link request for the episode being opened. */
+    /** Player page request: Full HD link, or a spare link after an error. */
     private var linkJob: Job? = null
+
+    /** The site player page is being fetched; the screen shows a spinner. */
+    var loadingLink by mutableStateOf(false)
+        private set
+
+    /** Player page links of the current episode and when they were fetched. */
+    private var pageLinks: Map<Quality, List<String>> = emptyMap()
+    private var pageAt = 0L
+
+    /** Links of the current episode already played or failed. */
+    private val triedLinks = mutableSetOf<String>()
 
     private var resumeMs: Long =
         Repo.progress(titleId)?.takeIf { it.episode == startEp && it.positionMs > 0 }?.positionMs ?: 0L
@@ -109,17 +123,34 @@ class PlayerViewModel(
         hasPrev = itemFor(item.index - 1) != null
         val start = startMs ?: if (item.index == startEp && resumeMs > 0) resumeMs else 0L
         linkJob?.cancel()
+        pageLinks = emptyMap()
+        pageAt = 0L
+        triedLinks.clear()
         if (quality == Quality.FHD) {
             // not clearMediaItems(): an empty player reports STATE_ENDED, which skips to the next episode
             player.stop()
             linkJob = viewModelScope.launch {
-                val fullHd = Repo.fullHdUrl(item)
+                val fullHd = sitePlayerLinks(item)[Quality.FHD]?.firstOrNull()
                 if (fullHd == null) replaceFullHd()
                 startPlayback(fullHd ?: url, start)
             }
         } else {
             startPlayback(url, start)
         }
+    }
+
+    /** Fetches the player page unless it is fresh; its signed links expire after about 3 hours. */
+    private suspend fun sitePlayerLinks(item: PlaylistItem): Map<Quality, List<String>> {
+        if (System.currentTimeMillis() - pageAt > PAGE_FRESH_MS) {
+            loadingLink = true
+            try {
+                pageLinks = Repo.playerLinks(item)
+                pageAt = System.currentTimeMillis()
+            } finally {
+                loadingLink = false
+            }
+        }
+        return pageLinks
     }
 
     /** Full HD is looked up per episode, so unlike [qualityOverride] this lasts for one episode only. */
@@ -136,6 +167,7 @@ class PlayerViewModel(
             }
         }.build()
 
+        triedLinks += url
         // a fresh decoder: some TV hardware decoders freeze when one instance changes resolution
         player.stop()
         player.setMediaItem(mediaItem, startMs)
@@ -144,27 +176,38 @@ class PlayerViewModel(
     }
 
     /**
-      * Playback error. Some episodes exist in one quality only (e.g. HD returns 404 for
-      * old episodes) — then try the other one.
+      * Playback error. First another link of the same quality from the site player: a link may
+      * have expired during a long pause, or the video host may be blocked. Then a lower quality.
       */
     private fun onPlaybackFailed() {
-        val item = itemFor(currentEp)
-        val hdUrl = item?.url(Quality.HD)
+        val item = itemFor(currentEp) ?: return
+        val position = player.currentPosition.coerceAtLeast(0L)
+        val failed = quality
+        linkJob?.cancel()
+        linkJob = viewModelScope.launch {
+            val spare = sitePlayerLinks(item)[failed]?.firstOrNull { it !in triedLinks }
+            if (spare != null) startPlayback(spare, position) else lowerQuality(item, position)
+        }
+    }
+
+    /** Some episodes exist in one quality only (e.g. HD returns 404 for old episodes). */
+    private fun lowerQuality(item: PlaylistItem, position: Long) {
+        val hdUrl = item.url(Quality.HD)
         if (quality == Quality.FHD && hdUrl != null) {
             replaceFullHd()
-            startPlayback(hdUrl, player.currentPosition.coerceAtLeast(0L))
+            startPlayback(hdUrl, position)
             return
         }
         val other = if (quality == Quality.HD) Quality.SD else Quality.HD
-        val otherUrl = item?.url(other)
-        if (item != null && !fallbackTried && otherUrl != null && otherUrl != item.url(quality)) {
+        val otherUrl = item.url(other)
+        if (!fallbackTried && otherUrl != null && otherUrl != item.url(quality)) {
             fallbackTried = true
             notice = "${quality.label} недоступно для этой серии — включено ${other.label}"
             quality = other
             qualityOverride = other
-            startPlayback(otherUrl, player.currentPosition.coerceAtLeast(0L))
+            startPlayback(otherUrl, position)
         } else {
-            error = "Не удалось воспроизвести: ${item?.label ?: "серия"}.\nВидеофайл недоступен на сервере."
+            error = "Не удалось воспроизвести: ${item.label}.\nВидеофайл недоступен на сервере."
         }
     }
 

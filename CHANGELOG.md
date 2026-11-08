@@ -4,6 +4,18 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/).
 
+## [1.7.0] - 2026-11-08
+
+### Added
+- Average rating on poster tiles in the feed and search, e.g. "★ 4,3".
+- A spinner while the player fetches a link from the site.
+
+### Changed
+- When a video fails, the player first tries other servers of the same quality from the site player
+  and fetches fresh links if the old ones are over 5 minutes old (links expire after about 3 hours,
+  e.g. during a long pause). Only then it switches to a lower quality.
+- Player page requests time out after 6 seconds per site instead of 15.
+
 ## [1.6.0] - 2026-11-04
 
 ### Added

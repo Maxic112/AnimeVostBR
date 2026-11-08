@@ -48,6 +48,7 @@ import coil.compose.AsyncImage
 import com.animevostbr.core.Title
 import com.animevostbr.core.TitleLite
 import com.animevostbr.core.TitlesParser
+import java.util.Locale
 
 /** Title poster card for touch and D-pad (focus scales it up). */
 @OptIn(ExperimentalFoundationApi::class)
@@ -103,6 +104,14 @@ fun PosterCard(
                         .align(Alignment.TopEnd)
                         .padding(6.dp)
                         .size(18.dp)
+                )
+            }
+            if (title.votes > 0) {
+                RatingBadge(
+                    title = title,
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(6.dp)
                 )
             }
             if (focused && isTv) {
@@ -185,6 +194,31 @@ fun RowCard(
             }
         }
         trailing?.invoke()
+    }
+}
+
+/** Average rating over the poster, e.g. "★ 4,3". */
+@Composable
+fun RatingBadge(title: Title, modifier: Modifier = Modifier) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(Color.Black.copy(alpha = 0.7f))
+            .padding(horizontal = 6.dp, vertical = 2.dp)
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Star,
+            contentDescription = "Рейтинг",
+            tint = AccentColor,
+            modifier = Modifier.size(14.dp)
+        )
+        Text(
+            text = String.format(Locale("ru"), "%.1f", title.average),
+            style = MaterialTheme.typography.labelSmall,
+            color = Color.White,
+            modifier = Modifier.padding(start = 3.dp)
+        )
     }
 }
 

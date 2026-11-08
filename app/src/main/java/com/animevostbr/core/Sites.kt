@@ -5,6 +5,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.IOException
 import java.util.concurrent.TimeUnit
@@ -37,6 +38,15 @@ object Sites {
             .build()
     }
 
+    /** For requests made while the viewer waits in the player. */
+    private val quickHttp by lazy {
+        http.newBuilder()
+            .connectTimeout(4, TimeUnit.SECONDS)
+            .readTimeout(5, TimeUnit.SECONDS)
+            .callTimeout(6, TimeUnit.SECONDS)
+            .build()
+    }
+
     val mode: SiteMode get() = SiteMode.entries.getOrElse(Repo.prefs.siteMode) { SiteMode.AUTO }
     val mirrorHost: String get() = Repo.prefs.mirrorHost
 
@@ -55,11 +65,11 @@ object Sites {
     }
 
     /** GET with fallback across [bases]. Returns (site base, HTML). */
-    fun fetch(path: String): Pair<String, String> {
+    fun fetch(path: String, quick: Boolean = false): Pair<String, String> {
         var last: Exception? = null
         for (base in bases()) {
             try {
-                val html = get(base + path)
+                val html = get(base + path, if (quick) quickHttp else http)
                 if (mode == SiteMode.AUTO) autoPreferMirror = !base.endsWith(MAIN_HOST)
                 return base to html
             } catch (e: Exception) {
@@ -70,9 +80,9 @@ object Sites {
     }
 
     /** Plain GET: anything but 200 throws. */
-    fun get(url: String): String {
+    fun get(url: String, client: OkHttpClient = http): String {
         val request = Request.Builder().url(url).header("User-Agent", ApiClient.UA).build()
-        http.newCall(request).execute().use { r ->
+        client.newCall(request).execute().use { r ->
             if (!r.isSuccessful) throw HttpStatusException(r.code)
             return r.body?.string().orEmpty()
         }

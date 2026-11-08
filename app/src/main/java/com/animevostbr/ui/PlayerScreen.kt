@@ -39,6 +39,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -235,6 +236,10 @@ fun PlayerScreen(vm: PlayerViewModel, onBack: () -> Unit) {
             },
             modifier = Modifier.fillMaxSize()
         )
+
+        if (vm.loadingLink) {
+            CircularProgressIndicator(color = AccentColor, modifier = Modifier.align(Alignment.Center))
+        }
 
         vm.notice?.let { message ->
             LaunchedEffect(message) {

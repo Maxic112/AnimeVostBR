@@ -40,6 +40,7 @@ data class Title(
     /** `rating` is the SUM of votes: average = rating / votes, mapped to 1..5 stars. */
     val stars: Int get() = if (votes > 0) (ratingSum.toDouble() / votes).roundToInt().coerceIn(1, 5) else 0
     val percent: Int get() = stars * 20
+    val average: Double get() = if (votes > 0) ratingSum.toDouble() / votes else 0.0
     /** Number of entries in `series`; numbers inside episode names are unreliable. */
     val episodesOut: Int get() = series.size
 
@@ -85,7 +86,7 @@ data class Progress(
 /**
   * `index` is the 1-based playlist position, `label` is the name sent by the server.
   * Either quality may be missing; [url] falls back to the other one.
-  * The playlist has no Full HD link: [Repo.fullHdUrl] asks the site, [url] gives HD for it.
+  * The playlist has no Full HD link: [Repo.playerLinks] asks the site, [url] gives HD for it.
   */
 data class PlaylistItem(
     val index: Int,

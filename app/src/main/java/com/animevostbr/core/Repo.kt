@@ -110,9 +110,9 @@ object Repo {
         fromApi.ifEmpty { runCatching { SiteSource.playlist(id) }.getOrDefault(emptyList()) }
     }
 
-    /** Null when the episode has no Full HD or the site cannot be reached. */
-    suspend fun fullHdUrl(item: PlaylistItem): String? = withContext(Dispatchers.IO) {
-        item.videoId?.let { id -> runCatching { SiteSource.fullHd(id) }.getOrNull() }
+    /** Links from the site player, see [SiteSource.parsePlayerLinks]; empty when the site cannot be reached. */
+    suspend fun playerLinks(item: PlaylistItem): Map<Quality, List<String>> = withContext(Dispatchers.IO) {
+        item.videoId?.let { id -> runCatching { SiteSource.playerLinks(id) }.getOrNull() }.orEmpty()
     }
 
     /** One page of a catalog listing; an empty list past the last page. Throws on network errors. */
