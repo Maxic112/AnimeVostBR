@@ -1,6 +1,8 @@
 package com.animevostbr.playback
 
 import android.app.Application
+import android.net.ConnectivityManager
+import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
@@ -9,11 +11,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
+import androidx.media3.common.ForwardingPlayer
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.session.MediaSession
+import com.animevostbr.core.Downloads
 import com.animevostbr.core.PlaylistItem
 import com.animevostbr.core.Progress
 import com.animevostbr.core.Quality
@@ -21,9 +26,6 @@ import com.animevostbr.core.Repo
 import com.animevostbr.core.TitleLite
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
-
-/** Player page links are fetched again after this, so expired ones get replaced. */
-private const val PAGE_FRESH_MS = 5 * 60 * 1000L
 
 /**
   * Owns the ExoPlayer instance, the episode list, quality and watch progress.
@@ -52,8 +54,8 @@ class PlayerViewModel(
     var notice by mutableStateOf<String?>(null)
         private set
 
-    /** The other quality was already tried for the current episode after an error. */
-    private var fallbackTried = false
+    /** HD and SD were already swapped for the current episode after an error. */
+    private var swapTried = false
 
     /**
       * Quality forced by a playback error. Old titles often lack HD for every episode,
@@ -75,19 +77,46 @@ class PlayerViewModel(
     /** Links of the current episode already played or failed. */
     private val triedLinks = mutableSetOf<String>()
 
+    /** A quality was picked in the player: stream it even where a download exists. */
+    private var preferOnline = false
+
     private var resumeMs: Long =
         Repo.progress(titleId)?.takeIf { it.episode == startEp && it.positionMs > 0 }?.positionMs ?: 0L
 
-    val player: ExoPlayer = ExoPlayer.Builder(app).build().apply {
-        setAudioAttributes(
-            AudioAttributes.Builder()
-                .setUsage(C.USAGE_MEDIA)
-                .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
-                .build(),
-            true
-        )
-        playWhenReady = true
-    }
+    private val connectivity = app.getSystemService(ConnectivityManager::class.java)
+
+    val player: ExoPlayer = ExoPlayer.Builder(app)
+        // unplugged headphones or a disconnected Bluetooth headset pause instead of playing aloud
+        .setHandleAudioBecomingNoisy(true)
+        .build().apply {
+            setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(C.USAGE_MEDIA)
+                    .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
+                    .build(),
+                true
+            )
+            playWhenReady = true
+        }
+
+    /** Headset buttons and the system media controls; next/previous switch episodes. */
+    private val session: MediaSession = MediaSession.Builder(app, object : ForwardingPlayer(player) {
+        override fun getAvailableCommands(): Player.Commands = super.getAvailableCommands().buildUpon()
+            .addAll(Player.COMMAND_SEEK_TO_NEXT, Player.COMMAND_SEEK_TO_PREVIOUS)
+            .build()
+
+        override fun isCommandAvailable(command: Int): Boolean =
+            command == Player.COMMAND_SEEK_TO_NEXT || command == Player.COMMAND_SEEK_TO_PREVIOUS ||
+                super.isCommandAvailable(command)
+
+        override fun seekToNext() = this@PlayerViewModel.next()
+        override fun seekToNextMediaItem() = this@PlayerViewModel.next()
+        override fun seekToPrevious() = this@PlayerViewModel.prev()
+        override fun seekToPreviousMediaItem() = this@PlayerViewModel.prev()
+    })
+        // one session per player screen; ids must differ while an old one is being released
+        .setId("player-${System.nanoTime()}")
+        .build()
 
     init {
         player.addListener(object : Player.Listener {
@@ -109,10 +138,17 @@ class PlayerViewModel(
 
     val currentLabel: String get() = itemFor(currentEp)?.label ?: "Серия $currentEp"
 
+    private fun metered(): Boolean = runCatching { connectivity?.isActiveNetworkMetered == true }.getOrDefault(false)
+
     fun playEpisode(ep: Int, startMs: Long? = null) {
         val item = itemFor(ep) ?: return
-        quality = qualityOverride ?: Repo.prefs.defaultQuality
-        fallbackTried = false
+        quality = PlaybackRules.startQuality(
+            default = Repo.prefs.defaultQuality,
+            override = qualityOverride,
+            mobile = Repo.prefs.mobileQuality,
+            metered = metered()
+        )
+        swapTried = false
         val url = item.url(quality) ?: run {
             error = "Нет видеопотока: ${item.label}"
             return
@@ -126,7 +162,14 @@ class PlayerViewModel(
         pageLinks = emptyMap()
         pageAt = 0L
         triedLinks.clear()
-        if (quality == Quality.FHD) {
+        // a downloaded episode plays from the file unless a quality was picked in the player;
+        // if the file fails, the error path goes online with the same quality
+        val local = if (preferOnline) null else Downloads.localFile(getApplication(), titleId, item.videoId)
+        if (local != null) {
+            quality = local.second
+            notice = "Скачанная серия — интернет не нужен"
+            startPlayback(Uri.fromFile(local.first).toString(), start)
+        } else if (quality == Quality.FHD) {
             // not clearMediaItems(): an empty player reports STATE_ENDED, which skips to the next episode
             player.stop()
             linkJob = viewModelScope.launch {
@@ -141,7 +184,7 @@ class PlayerViewModel(
 
     /** Fetches the player page unless it is fresh; its signed links expire after about 3 hours. */
     private suspend fun sitePlayerLinks(item: PlaylistItem): Map<Quality, List<String>> {
-        if (System.currentTimeMillis() - pageAt > PAGE_FRESH_MS) {
+        if (PlaybackRules.pageStale(pageAt, System.currentTimeMillis())) {
             loadingLink = true
             try {
                 pageLinks = Repo.playerLinks(item)
@@ -153,7 +196,6 @@ class PlayerViewModel(
         return pageLinks
     }
 
-    /** Full HD is looked up per episode, so unlike [qualityOverride] this lasts for one episode only. */
     private fun replaceFullHd() {
         notice = "${Quality.FHD.label} недоступно для этой серии — включено ${Quality.HD.label}"
         quality = Quality.HD
@@ -185,29 +227,26 @@ class PlayerViewModel(
         val failed = quality
         linkJob?.cancel()
         linkJob = viewModelScope.launch {
-            val spare = sitePlayerLinks(item)[failed]?.firstOrNull { it !in triedLinks }
+            val spare = PlaybackRules.spareLink(sitePlayerLinks(item), failed, triedLinks)
             if (spare != null) startPlayback(spare, position) else lowerQuality(item, position)
         }
     }
 
-    /** Some episodes exist in one quality only (e.g. HD returns 404 for old episodes). */
     private fun lowerQuality(item: PlaylistItem, position: Long) {
-        val hdUrl = item.url(Quality.HD)
-        if (quality == Quality.FHD && hdUrl != null) {
-            replaceFullHd()
-            startPlayback(hdUrl, position)
-            return
-        }
-        val other = if (quality == Quality.HD) Quality.SD else Quality.HD
-        val otherUrl = item.url(other)
-        if (!fallbackTried && otherUrl != null && otherUrl != item.url(quality)) {
-            fallbackTried = true
-            notice = "${quality.label} недоступно для этой серии — включено ${other.label}"
-            quality = other
-            qualityOverride = other
-            startPlayback(otherUrl, position)
-        } else {
-            error = "Не удалось воспроизвести: ${item.label}.\nВидеофайл недоступен на сервере."
+        when (val step = PlaybackRules.lower(item, quality, swapTried)) {
+            is PlaybackRules.Fallback.Lower -> {
+                if (step.remember) {
+                    swapTried = true
+                    qualityOverride = step.quality
+                    notice = "${quality.label} недоступно для этой серии — включено ${step.quality.label}"
+                    quality = step.quality
+                } else {
+                    replaceFullHd()
+                }
+                startPlayback(step.url, position)
+            }
+            PlaybackRules.Fallback.Fail ->
+                error = "Не удалось воспроизвести: ${item.label}.\nВидеофайл недоступен на сервере."
         }
     }
 
@@ -235,10 +274,19 @@ class PlayerViewModel(
         }
     }
 
-    fun toggleQuality() {
-        quality = quality.next()
-        Repo.prefs.defaultQuality = quality
+    fun skipIntro() {
+        val target = player.currentPosition + PlaybackRules.SKIP_INTRO_MS
+        player.seekTo(if (player.duration > 0) target.coerceAtMost(player.duration - 1000) else target)
+    }
+
+    /**
+      * Picked in the player. On a metered network with its own setting the choice is kept for
+      * mobile networks, so Wi-Fi keeps its quality.
+      */
+    fun selectQuality(q: Quality) {
+        if (metered() && Repo.prefs.mobileQuality != null) Repo.prefs.mobileQuality = q else Repo.prefs.defaultQuality = q
         qualityOverride = null // the user picked a quality explicitly
+        preferOnline = true
         playEpisode(currentEp, player.currentPosition.takeIf { it > 0 })
     }
 
@@ -268,6 +316,7 @@ class PlayerViewModel(
 
     override fun onCleared() {
         saveProgress()
+        session.release()
         player.release()
         super.onCleared()
     }

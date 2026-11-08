@@ -25,7 +25,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -117,7 +117,7 @@ fun SearchScreen(
             .padding(16.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(modifier = Modifier.focusBorder(CircleShape), onClick = onBack) { Icon(Icons.Filled.ArrowBack, contentDescription = "Назад") }
+            IconButton(modifier = Modifier.focusBorder(CircleShape), onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад") }
             OutlinedTextField(
                 value = query,
                 onValueChange = { query = it },

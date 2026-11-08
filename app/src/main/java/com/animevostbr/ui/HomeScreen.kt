@@ -7,9 +7,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -45,6 +45,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
@@ -76,6 +77,7 @@ fun HomeScreen(
     onOpen: (Int) -> Unit,
     onPlay: (id: Int, episode: Int) -> Unit,
     onSearch: () -> Unit,
+    onSchedule: () -> Unit,
     onFavorites: () -> Unit,
     onSettings: () -> Unit
 ) {
@@ -131,12 +133,7 @@ fun HomeScreen(
         }
         message?.let { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() }
     }
-    if (pullState.isRefreshing) {
-        LaunchedEffect(true) {
-            reload()
-            pullState.endRefresh()
-        }
-    }
+    var pullRefreshing by remember { mutableStateOf(false) }
 
     val pagerState = rememberPagerState(pageCount = { 2 })
     val scope = rememberCoroutineScope()
@@ -173,6 +170,7 @@ fun HomeScreen(
                 }
             }
             IconButton(modifier = Modifier.focusBorder(CircleShape), onClick = onSearch) { Icon(Icons.Filled.Search, contentDescription = "Поиск") }
+            IconButton(modifier = Modifier.focusBorder(CircleShape), onClick = onSchedule) { Icon(Icons.Filled.CalendarMonth, contentDescription = "Расписание") }
             IconButton(modifier = Modifier.focusBorder(CircleShape), onClick = onFavorites) { Icon(Icons.Filled.FavoriteBorder, contentDescription = "Избранное") }
             IconButton(modifier = Modifier.focusBorder(CircleShape), onClick = onSettings) {
                 Box {
@@ -210,10 +208,37 @@ fun HomeScreen(
 
         HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
             when (page) {
-                0 -> Box(
-                    Modifier
-                        .nestedScroll(pullState.nestedScrollConnection)
-                        .clipToBounds() // at rest the indicator hides behind the top edge of the feed
+                // TV: the header button refreshes; remote scrolling would leave the pull indicator hanging
+                0 -> if (isTv) FeedPage(
+                    isTv = true,
+                    list = list,
+                    failed = failed,
+                    gridState = gridState,
+                    focusTargetId = if (restoreFocus) focusedId ?: list.firstOrNull()?.id else null,
+                    onFocusRestored = { restoreFocus = false },
+                    onFocused = { focusedId = it },
+                    onRetry = { refresh++ },
+                    onOpen = onOpen,
+                    onPlay = onPlay
+                ) else PullToRefreshBox(
+                    isRefreshing = pullRefreshing,
+                    onRefresh = {
+                        scope.launch {
+                            pullRefreshing = true
+                            try { reload() } finally { pullRefreshing = false }
+                        }
+                    },
+                    state = pullState,
+                    modifier = Modifier.clipToBounds(), // at rest the indicator hides behind the top edge of the feed
+                    indicator = {
+                        PullToRefreshDefaults.Indicator(
+                            state = pullState,
+                            isRefreshing = pullRefreshing,
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            color = AccentColor,
+                            modifier = Modifier.align(Alignment.TopCenter)
+                        )
+                    }
                 ) {
                     FeedPage(
                         isTv = isTv,
@@ -226,12 +251,6 @@ fun HomeScreen(
                         onRetry = { refresh++ },
                         onOpen = onOpen,
                         onPlay = onPlay
-                    )
-                    if (pullState.progress > 0f || pullState.isRefreshing) PullToRefreshContainer(
-                        state = pullState,
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        contentColor = AccentColor,
-                        modifier = Modifier.align(Alignment.TopCenter)
                     )
                 }
                 else -> ContinuePage(

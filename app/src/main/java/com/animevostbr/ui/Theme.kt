@@ -18,6 +18,8 @@ import com.animevostbr.core.ThemeMode
 object UiState {
     var themeMode by mutableStateOf(ThemeMode.DARK)
     var tvMode by mutableStateOf(false)
+    /** The activity is shown as a picture-in-picture window. */
+    var inPip by mutableStateOf(false)
 }
 
 private val Accent = Color(0xFF00E676)

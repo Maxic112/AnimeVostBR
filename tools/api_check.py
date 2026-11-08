@@ -227,6 +227,36 @@ def check_site_fallback():
     return OK, f"{host}: серий {n}, тайтлов в ленте {feed}"
 
 
+def check_player_page():
+    """The site player (/frame5.php): Full HD and spare video servers for every quality come from it."""
+    ep = ctx.get("episode")
+    if not ep:
+        return WARN, "нет серии для проверки (playlist не прошёл)"
+    vid = re.search(r"/(\d+)\.mp4", ep.get("std") or ep.get("hd") or "")
+    if not vid:
+        return WARN, "в плейлисте нет id видео"
+    code, body = 0, ""
+    for host in (MAIN, ctx.get("mirror", DEFAULT_MIRROR)):
+        code, body, _ = http(f"https://{host}/frame5.php?play={vid.group(1)}&old=1")
+        if code == 200:
+            break
+    if code != 200:
+        return FAIL, f"HTTP {code}"
+    # the first complete "file" string; a spare player glued from pieces stops at its first quote
+    m = re.search(r'"file":"([^"]*\[[^"]*)"', body)
+    if not m:
+        return FAIL, 'нет блока "file" — сменилась разметка: Full HD и запасные серверы не работают'
+    labels = " ".join(re.findall(r"\[([^\]]*)\]", m.group(1)))
+    if "480" not in labels or "720" not in labels:
+        return WARN, f"неполный список качеств: {labels or 'пусто'}"
+    fhd = re.search(r"\[FHD[^\]]*\]([^,\[]+)", m.group(1))
+    url = next((u.strip() for u in fhd.group(1).split(" or ") if "/1080/" in u), None) if fhd else None
+    if not url:
+        return OK, "SD и HD есть, Full HD у этой серии нет"
+    status, detail = probe(url)
+    return status, f"SD, HD и Full HD; Full HD: {detail}"
+
+
 def main():
     quiet = "--quiet" in sys.argv
     r = Report()
@@ -240,6 +270,7 @@ def main():
     r.run(f"Основной сайт {MAIN}", lambda: check_site(MAIN))
     r.run("Зеркало (поиск актуального)", find_mirror)
     r.run("Резерв: серии и лента с зеркала", check_site_fallback)
+    r.run("Страница плеера: Full HD, запасные", check_player_page)
 
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     icons = {OK: "OK  ", WARN: "WARN", FAIL: "FAIL"}

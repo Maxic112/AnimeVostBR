@@ -4,6 +4,29 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/).
 
+## [1.8.0] - 2026-11-08
+
+### Added
+- Schedule: upcoming episodes of the favorites by day, from the calendar icon on the home screen.
+- Downloads for offline viewing in any quality, via the system download manager: "Download episodes"
+  on the title page (or a long press on an episode on phones), Settings → Downloads to watch and delete.
+  Downloaded episodes play from storage.
+- Phone ↔ TV sync of favorites and watch progress over the local network with a 6-digit code; the
+  waiting device is found automatically (NSD) or by address.
+- Quality setting for mobile (metered) networks.
+- Player: quality menu instead of cycling, "Skip 90 s" during the first minutes, a countdown to the next
+  episode, picture-in-picture on phones, headset buttons and system media controls (media session).
+- Daily source health check in GitHub Actions, now also covering the site player page.
+
+### Fixed
+- Playback went on in the background after leaving the app (Home on the TV remote, switching apps).
+- Unplugging headphones kept playing through the speaker.
+
+### Changed
+- Media3 1.4.1, Compose BOM 2024.09; deprecated APIs replaced. Pull-to-refresh is phone-only: on TV it
+  left its indicator over the feed, and the header button refreshes.
+- Player decisions (quality, spare links, countdown) moved to `PlaybackRules` with unit tests.
+
 ## [1.7.0] - 2026-11-08
 
 ### Added

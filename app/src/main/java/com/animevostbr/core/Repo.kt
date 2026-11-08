@@ -2,6 +2,11 @@ package com.animevostbr.core
 
 import android.content.Context
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import java.util.concurrent.ConcurrentHashMap
 
@@ -101,6 +106,24 @@ object Repo {
             }.getOrNull()
             (fromApi ?: runCatching { SiteSource.title(id) }.getOrNull() ?: cache[id])
                 ?.also { cache[it.id] = it }
+        }
+    }
+
+    /** Fresh cards of the favorites for the schedule: the next-episode time changes after every release. */
+    suspend fun favoriteCards(): List<Title> = withContext(Dispatchers.IO) {
+        val gate = Semaphore(4)
+        coroutineScope {
+            favorites().map { lite ->
+                async {
+                    gate.withPermit {
+                        val fromApi = runCatching {
+                            TitlesParser.parseList(ApiClient.api.info(lite.id.toString()).string()).firstOrNull()
+                        }.getOrNull()
+                        (fromApi ?: runCatching { SiteSource.title(lite.id) }.getOrNull() ?: cache[lite.id])
+                            ?.also { cache[it.id] = it }
+                    }
+                }
+            }.awaitAll().filterNotNull()
         }
     }
 

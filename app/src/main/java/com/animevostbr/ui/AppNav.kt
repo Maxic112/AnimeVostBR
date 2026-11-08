@@ -39,8 +39,16 @@ fun AppNav(isTv: Boolean, openTitleId: Int?, onTitleOpened: () -> Unit) {
                 onOpen = { id -> nav.navigate("details/$id") },
                 onPlay = { id, ep -> nav.navigate("player/$id/$ep") },
                 onSearch = { nav.navigate("search") },
+                onSchedule = { nav.navigate("schedule") },
                 onFavorites = { nav.navigate("favorites") },
                 onSettings = { nav.navigate("settings") }
+            )
+        }
+
+        composable("schedule") {
+            ScheduleScreen(
+                onOpen = { id -> nav.navigate("details/$id") },
+                onBack = { nav.popBackStack() }
             )
         }
 
@@ -84,7 +92,20 @@ fun AppNav(isTv: Boolean, openTitleId: Int?, onTitleOpened: () -> Unit) {
             SettingsScreen(
                 onBack = { nav.popBackStack() },
                 onDiagnostics = { nav.navigate("diagnostics") },
-                onUpdate = { nav.navigate("update") }
+                onUpdate = { nav.navigate("update") },
+                onSync = { nav.navigate("sync") },
+                onDownloads = { nav.navigate("downloads") }
+            )
+        }
+
+        composable("sync") {
+            SyncScreen(onBack = { nav.popBackStack() })
+        }
+
+        composable("downloads") {
+            DownloadsScreen(
+                onPlay = { id, ep -> nav.navigate("player/$id/$ep") },
+                onBack = { nav.popBackStack() }
             )
         }
 
@@ -115,7 +136,7 @@ fun AppNav(isTv: Boolean, openTitleId: Int?, onTitleOpened: () -> Unit) {
                 navArgument("id") { type = NavType.IntType },
                 navArgument("ep") { type = NavType.IntType }
             )
-        ) { entry ->
+        ) {
             val vm: PlayerViewModel = viewModel()
             PlayerScreen(vm = vm, onBack = { nav.popBackStack() })
         }

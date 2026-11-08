@@ -1,0 +1,35 @@
+name: Source health
+
+# The app depends on a private API and on the site's markup. This runs tools/api_check.py daily,
+# so a change on their side shows up as a failed run before users notice empty lists.
+on:
+  schedule:
+    - cron: "17 6 * * *" # every day, 09:17 Moscow time
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: API, site and player page
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check sources
+        run: |
+          set +e
+          python tools/api_check.py
+          code=$?
+          # 1 = warnings (e.g. the mirror moved): shown in the log, the run still passes
+          if [ "$code" -eq 1 ]; then echo "::warning::Warnings in the report above"; fi
+          if [ "$code" -ge 2 ]; then
+            echo "::error::Something the app depends on is broken, see the report above"
+            exit 1
+          fi

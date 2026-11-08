@@ -29,6 +29,11 @@ class Prefs(context: Context) {
         get() = sp.getString("quality", null).let { saved -> Quality.entries.find { it.name == saved } } ?: Quality.HD
         set(v) = sp.edit().putString("quality", v.name).apply()
 
+    /** Quality on a metered (mobile) network; null = same as [defaultQuality]. */
+    var mobileQuality: Quality?
+        get() = sp.getString("mobile_quality", null).let { saved -> Quality.entries.find { it.name == saved } }
+        set(v) = sp.edit().apply { if (v == null) remove("mobile_quality") else putString("mobile_quality", v.name) }.apply()
+
     /** Tiles per row in feed and search; 0 = auto (3 on phones, by width on TV). */
     var gridColumns: Int
         get() = sp.getInt("grid_columns", 0)
@@ -109,6 +114,17 @@ class Prefs(context: Context) {
             saveFavorites(list)
             true
         }
+    }
+
+    fun syncData(): SyncData = SyncData(favorites(), progressMap(), seenMap())
+
+    /** Replaces favorites, progress and counters with merged sync data. */
+    fun applySync(d: SyncData) {
+        sp.edit()
+            .putString("favorites", gson.toJson(d.favorites))
+            .putString("progress", gson.toJson(d.progress))
+            .putString("seen", gson.toJson(d.seen))
+            .apply()
     }
 
     private fun saveFavorites(list: MutableList<TitleLite>) =

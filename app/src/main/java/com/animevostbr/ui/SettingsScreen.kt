@@ -26,7 +26,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -44,6 +44,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.SystemUpdate
+import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.draw.clip
 import com.animevostbr.AnimeVostApp
 import com.animevostbr.core.AppUpdate
@@ -52,10 +55,17 @@ import com.animevostbr.core.Repo
 import com.animevostbr.core.ThemeMode
 
 @Composable
-fun SettingsScreen(onBack: () -> Unit, onDiagnostics: () -> Unit, onUpdate: () -> Unit) {
+fun SettingsScreen(
+    onBack: () -> Unit,
+    onDiagnostics: () -> Unit,
+    onUpdate: () -> Unit,
+    onSync: () -> Unit,
+    onDownloads: () -> Unit
+) {
     val context = LocalContext.current
     var theme by remember { mutableStateOf(Repo.prefs.themeMode) }
     var quality by remember { mutableStateOf(Repo.prefs.defaultQuality) }
+    var mobileQuality by remember { mutableStateOf(Repo.prefs.mobileQuality) }
     var notifs by remember { mutableStateOf(Repo.prefs.notificationsEnabled) }
     val appVersion = remember { runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull().orEmpty() }
     var columns by remember { mutableStateOf(Repo.prefs.gridColumns) }
@@ -76,7 +86,7 @@ fun SettingsScreen(onBack: () -> Unit, onDiagnostics: () -> Unit, onUpdate: () -
             .padding(16.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(modifier = Modifier.focusBorder(CircleShape), onClick = onBack) { Icon(Icons.Filled.ArrowBack, contentDescription = "Назад") }
+            IconButton(modifier = Modifier.focusBorder(CircleShape), onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад") }
             Text(
                 text = "Настройки",
                 style = MaterialTheme.typography.titleLarge,
@@ -112,6 +122,8 @@ fun SettingsScreen(onBack: () -> Unit, onDiagnostics: () -> Unit, onUpdate: () -
             if (update != null) UpdateDot(Modifier.padding(end = 8.dp))
             Icon(Icons.Filled.ChevronRight, contentDescription = null)
         }
+        NavRow(Icons.Filled.Sync, "Синхронизация", "Избранное и прогресс между телефоном и телевизором", onSync)
+        NavRow(Icons.Filled.Download, "Загрузки", "Скачанные серии для просмотра без интернета", onDownloads)
 
         SectionTitle(text = "Оформление", modifier = Modifier.padding(top = 16.dp))
         Text(
@@ -298,6 +310,29 @@ fun SettingsScreen(onBack: () -> Unit, onDiagnostics: () -> Unit, onUpdate: () -
             }
         )
 
+        SectionTitle(text = "Качество в мобильной сети", modifier = Modifier.padding(top = 16.dp))
+        Text(
+            text = "Для мобильного интернета и точек доступа с ограничением трафика. Серия в Full HD — до нескольких гигабайт.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        val mobileOptions = listOf<Pair<Quality?, String>>(
+            null to "Как по Wi-Fi",
+            Quality.FHD to "Full HD",
+            Quality.HD to "HD",
+            Quality.SD to "SD (меньше всего трафика)"
+        )
+        for ((value, label) in mobileOptions) {
+            SettingRadio(
+                label = label,
+                selected = mobileQuality == value,
+                onClick = {
+                    mobileQuality = value
+                    Repo.prefs.mobileQuality = value
+                }
+            )
+        }
+
         SectionTitle(text = "Уведомления о новых сериях", modifier = Modifier.padding(top = 16.dp))
         Text(
             text = "Для тайтлов из избранного. Проверка каждые 30 минут, когда есть интернет.",
@@ -369,5 +404,36 @@ private fun SettingRadio(label: String, selected: Boolean, onClick: () -> Unit) 
             style = MaterialTheme.typography.bodyLarge,
             modifier = Modifier.padding(start = 4.dp)
         )
+    }
+}
+
+/** A settings row that opens another screen. */
+@Composable
+private fun NavRow(icon: ImageVector, title: String, subtitle: String, onClick: () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp)
+            .focusBorder(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+    ) {
+        Icon(icon, contentDescription = null)
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(start = 16.dp)
+        ) {
+            Text(text = title, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Icon(Icons.Filled.ChevronRight, contentDescription = null)
     }
 }
