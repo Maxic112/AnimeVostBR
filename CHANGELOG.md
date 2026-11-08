@@ -4,6 +4,15 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/).
 
+## [1.8.1] - 2026-11-08
+
+### Fixed
+- The app crashed when opening "Connection check". Compose 1.7 from 1.8.0 did not work with the
+  Compose compiler for Kotlin 1.9 and failed while the screen added result rows; Compose and the
+  libraries tied to it are back to the versions of 1.7.0 (Compose BOM 2024.02). Media3 1.4.1 stays.
+- Android no longer warns that the app does not support 16 KB memory pages: the native library that
+  came with Compose 1.7 is gone, so the APK has no native code again.
+
 ## [1.8.0] - 2026-11-08
 
 ### Added

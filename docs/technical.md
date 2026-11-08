@@ -24,8 +24,8 @@
 |---|---|
 | Пакет | `com.animevostbr` |
 | minSdk / targetSdk | 26 (Android 8.0) / 34 (Android 14) |
-| Язык и UI | Kotlin 1.9.22, Jetpack Compose (Material 3), одна Activity |
-| Плеер | Media3 ExoPlayer 1.2.1 |
+| Язык и UI | Kotlin 1.9.22, Jetpack Compose BOM 2024.02 (Material 3), одна Activity |
+| Плеер | Media3 ExoPlayer 1.4.1, media3-session |
 | Сеть | Retrofit 2.9 + OkHttp 4.12 + Gson, jsoup для HTML |
 | Фон | WorkManager 2.9 |
 | Сборка | Gradle 8.4, Android Gradle Plugin 8.2.2, JDK 17 |
@@ -453,6 +453,7 @@ debug-версию и откройте «Проверку соединения»
 
 ## Известные ограничения
 
+- Compose нельзя обновлять отдельно от Kotlin: Compose 1.7 с компилятором Compose для Kotlin 1.9  падал на экране «Проверка соединения» (1.8.0). Обновлять вместе — Kotlin 2.x и плагин компилятора  Compose — и проверять все экраны на телефоне и TV.
 - API закрытый и может измениться; парсеры терпимы к изменениям, а `tools/api_check.py` помогает быстро
   найти расхождение.
 - Сайт может быть недоступен у отдельных провайдеров — тогда помогает зеркало или другая сеть.
