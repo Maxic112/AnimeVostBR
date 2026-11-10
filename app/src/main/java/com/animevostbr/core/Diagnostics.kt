@@ -45,13 +45,17 @@ object Diagnostics {
         var sample: Title? = null
         var episode: PlaylistItem? = null
 
+        // each API address on its own: one is often blocked by an operator while the other works
+        for (host in ApiClient.API_HOSTS) {
+            step("API-сервер $host") { apiHost(host) }
+        }
         step("API: лента (/v1/last)") {
             val list = TitlesParser.parseList(ApiClient.api.last(1, 5).string())
             sample = list.firstOrNull()
             when {
                 list.isEmpty() -> Status.FAIL to "Пустой ответ или новый формат"
                 list.first().series.isEmpty() -> Status.WARN to "Тайтлов: ${list.size}, но нет поля series"
-                else -> Status.OK to "Тайтлов: ${list.size}"
+                else -> Status.OK to "Тайтлов: ${list.size} · через ${ApiClient.apiHost}"
             }
         }
         val id = sample?.id ?: 4032
@@ -107,6 +111,21 @@ object Diagnostics {
             val host = r.request.url.host
             return if (r.code == 200 || r.code == 206) Status.OK to "HTTP ${r.code} · $host"
             else Status.FAIL to "HTTP ${r.code} · $host"
+        }
+    }
+
+    /** WARN, not FAIL: the app works while at least one address answers. */
+    private fun apiHost(host: String): Pair<Status, String> {
+        val request = Request.Builder().url("https://$host/v1/last?page=1&quantity=1")
+            .header("User-Agent", ApiClient.UA)
+            .build()
+        return try {
+            ApiClient.ok.newCall(request).execute().use { r ->
+                if (ApiClient.isApiAnswer(r.code, r.header("Content-Type"))) Status.OK to "Отвечает"
+                else Status.WARN to "HTTP ${r.code}, ответ не от API — возможно, заблокирован; используется другой адрес"
+            }
+        } catch (e: Exception) {
+            Status.WARN to "${humanize(e)}; используется другой адрес"
         }
     }
 

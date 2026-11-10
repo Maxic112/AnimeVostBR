@@ -4,6 +4,41 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/).
 
+## [1.9.0] - 2026-11-10
+
+### Fixed
+- Nothing loaded on mobile networks and some Wi-Fi networks where `animevost.org` is blocked. The API
+  is also served at `api.animetop.info` (another server, the one the official app uses): the app now
+  tries it first and switches to the other address when one does not answer or returns an ISP block
+  page instead of JSON, then remembers the working one.
+- Sync brought back favorites and "Continue" entries removed on the other device: removals now carry a
+  time and the latest action wins.
+
+### Added
+- Catalog listings (genre, type, year) get filters and sorting: type, year and genre on top of the
+  listing; order by update, newest, oldest, title or rating. Ratings are fetched for the loaded titles,
+  and the listing keeps loading while a filter leaves too few titles.
+- Mark an episode and all earlier ones watched, or clear the marks: "Mark / download" on the title page
+  or a long press on an episode.
+- Backup to a file and restore from it (Settings → Sync and backup); restoring merges with the data on
+  the device.
+- Crash report kept on the device: after a crash, Settings shows it and lets you share or delete it.
+  Nothing is sent anywhere.
+- Voice search: a microphone button in Search when the device has a speech recognizer.
+- Playback speed is remembered for all episodes and launches.
+- Video plays over HTTPS, falling back to HTTP when needed.
+- Posters fall back to the site mirror and the main site when `static.openni.ru` does not load.
+- "Connection check" shows each API address separately and which one the feed came through.
+- The daily source health check covers both API addresses.
+- Screen tests under Robolectric open every screen on a phone and in TV mode in CI; the check that
+  adds diagnostics rows one by one reproduces the 1.8.0 crash on the old library versions.
+
+### Changed
+- Kotlin 2.0.21 with the Compose compiler plugin, Compose BOM 2024.12, AGP 8.7, Gradle 8.9 — the
+  library update that 1.8.0 attempted, now done with a matching compiler. The native library that came
+  with it is 16 KB aligned.
+- The episode button on the title page is now "Mark / download".
+
 ## [1.8.1] - 2026-11-08
 
 ### Fixed

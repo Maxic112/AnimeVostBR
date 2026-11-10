@@ -40,8 +40,12 @@ import androidx.compose.ui.unit.dp
 import com.animevostbr.core.Diagnostics
 import com.animevostbr.core.Diagnostics.Status
 
+/** [runChecks] is replaceable for screen tests: they feed results row by row without network. */
 @Composable
-fun DiagnosticsScreen(onBack: () -> Unit) {
+fun DiagnosticsScreen(
+    onBack: () -> Unit,
+    runChecks: suspend (onUpdate: (List<Diagnostics.Check>) -> Unit) -> Unit = { Diagnostics.run(it) }
+) {
     var checks by remember { mutableStateOf<List<Diagnostics.Check>>(emptyList()) }
     var run by remember { mutableStateOf(0) }
     val running = checks.any { it.status == Status.RUNNING } || (run > 0 && checks.isEmpty())
@@ -49,7 +53,7 @@ fun DiagnosticsScreen(onBack: () -> Unit) {
 
     LaunchedEffect(run) {
         checks = emptyList()
-        Diagnostics.run { checks = it }
+        runChecks { checks = it }
         if (UiState.tvMode) runCatching { buttonFocus.requestFocus() }
     }
 

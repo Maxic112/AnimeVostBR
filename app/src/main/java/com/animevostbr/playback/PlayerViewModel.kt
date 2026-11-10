@@ -15,6 +15,7 @@ import androidx.media3.common.ForwardingPlayer
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
+import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
@@ -77,6 +78,9 @@ class PlayerViewModel(
     /** Links of the current episode already played or failed. */
     private val triedLinks = mutableSetOf<String>()
 
+    /** The link playing now (or that just failed). */
+    private var lastUrl: String? = null
+
     /** A quality was picked in the player: stream it even where a download exists. */
     private var preferOnline = false
 
@@ -119,8 +123,13 @@ class PlayerViewModel(
         .build()
 
     init {
+        player.setPlaybackSpeed(Repo.prefs.playbackSpeed)
         player.addListener(object : Player.Listener {
             override fun onPlayerError(e: PlaybackException) = onPlaybackFailed()
+
+            override fun onPlaybackParametersChanged(params: PlaybackParameters) {
+                Repo.prefs.playbackSpeed = params.speed
+            }
         })
         viewModelScope.launch {
             items = Repo.playlist(titleId)
@@ -175,10 +184,10 @@ class PlayerViewModel(
             linkJob = viewModelScope.launch {
                 val fullHd = sitePlayerLinks(item)[Quality.FHD]?.firstOrNull()
                 if (fullHd == null) replaceFullHd()
-                startPlayback(fullHd ?: url, start)
+                startPlayback(fullHd ?: PlaybackRules.secure(url), start)
             }
         } else {
-            startPlayback(url, start)
+            startPlayback(PlaybackRules.secure(url), start)
         }
     }
 
@@ -210,6 +219,7 @@ class PlayerViewModel(
         }.build()
 
         triedLinks += url
+        lastUrl = url
         // a fresh decoder: some TV hardware decoders freeze when one instance changes resolution
         player.stop()
         player.setMediaItem(mediaItem, startMs)
@@ -227,7 +237,8 @@ class PlayerViewModel(
         val failed = quality
         linkJob?.cancel()
         linkJob = viewModelScope.launch {
-            val spare = PlaybackRules.spareLink(sitePlayerLinks(item), failed, triedLinks)
+            val failedUrl = lastUrl
+            val spare = PlaybackRules.nextLink(failedUrl, sitePlayerLinks(item), failed, triedLinks)
             if (spare != null) startPlayback(spare, position) else lowerQuality(item, position)
         }
     }
@@ -243,7 +254,7 @@ class PlayerViewModel(
                 } else {
                     replaceFullHd()
                 }
-                startPlayback(step.url, position)
+                startPlayback(PlaybackRules.secure(step.url), position)
             }
             PlaybackRules.Fallback.Fail ->
                 error = "Не удалось воспроизвести: ${item.label}.\nВидеофайл недоступен на сервере."

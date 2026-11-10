@@ -32,6 +32,56 @@ class SyncTest {
     }
 
     @Test
+    fun merge_aLaterRemovalWins_aLaterAddWins() {
+        val now = 10_000_000L
+        // the TV removed title 2 after the phone had added it; the phone re-added title 4 after the TV removed it
+        val phoneT = phone.copy(favoriteAddedTimes = mapOf(2 to 1_000L), favoriteRemovedTimes = emptyMap())
+        val tvT = tv.copy(
+            favorites = listOf(lite(4)),
+            favoriteAddedTimes = emptyMap(),
+            favoriteRemovedTimes = mapOf(2 to 2_000L, 4 to 1_000L)
+        )
+        val phoneReAdd = phoneT.copy(favorites = phoneT.favorites + lite(4), favoriteAddedTimes = mapOf(2 to 1_000L, 4 to 3_000L))
+        val m = Sync.merge(phoneReAdd, tvT, now)
+        assertEquals(listOf(1, 4), m.favorites.map { it.id })
+        assertEquals(2_000L, m.favoriteRemovedTimes!![2])
+    }
+
+    @Test
+    fun merge_removedProgressStaysRemovedUntilWatchedAgain() {
+        val now = 10_000_000L
+        val tvT = tv.copy(progress = tv.progress - 4, progressRemovedTimes = mapOf(4 to 100L))
+        assertEquals(setOf(1, 3), Sync.merge(phone, tvT, now).progress.keys)
+        // the phone's record of 4 (updatedAt 70) is older than the removal (100): gone
+        val withPhone4 = phone.copy(progress = phone.progress + (4 to progress(4, 3, at = 70)))
+        assertTrue(4 !in Sync.merge(withPhone4, tvT, now).progress)
+        // watched again after the removal: back
+        val watchedAgain = phone.copy(progress = phone.progress + (4 to progress(4, 3, at = 150)))
+        assertTrue(4 in Sync.merge(watchedAgain, tvT, now).progress)
+    }
+
+    @Test
+    fun backupFile_roundTripsAndRejectsForeignFiles() {
+        val back = Sync.fromJson(Sync.toJson(phone))
+        assertEquals(phone.favorites, back.favorites)
+        assertEquals(phone.progress, back.progress)
+        try {
+            Sync.fromJson("""{"hello":"world"}""")
+            fail("foreign file accepted")
+        } catch (e: Sync.SyncException) {
+            // no version, favorites or progress keys
+        }
+    }
+
+    @Test
+    fun merge_dataFrom18WithoutTimes() {
+        // Gson leaves the new fields null when 1.8 sends data
+        val old = SyncData(favorites = listOf(lite(9)), progress = emptyMap(), seen = emptyMap(), version = 1)
+        val m = Sync.merge(old, phone)
+        assertTrue(9 in m.favorites.map { it.id })
+    }
+
+    @Test
     fun exchange_overLoopbackGivesBothSidesTheSameData() {
         var tvKept: SyncData? = null
         val server = Sync.Server(code = "123456", local = { tv }, onMerged = { tvKept = it })

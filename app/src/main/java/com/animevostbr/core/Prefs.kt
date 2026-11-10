@@ -15,6 +15,11 @@ object ThemeMode {
   * SharedPreferences storage (JSON via Gson): settings, favorites, watch progress and
   * per-title episode counters used by notifications.
   */
+// add/removal times for sync, id → ms (see SyncData)
+private const val FAV_ADDED = "favorite_added_at"
+private const val FAV_REMOVED = "favorite_removed_at"
+private const val PROGRESS_REMOVED = "progress_removed_at"
+
 class Prefs(context: Context) {
 
     private val sp: SharedPreferences =
@@ -53,6 +58,11 @@ class Prefs(context: Context) {
     var videoResizeMode: Int
         get() = sp.getInt("video_resize_mode", 0)
         set(v) = sp.edit().putInt("video_resize_mode", v).apply()
+
+    /** Playback speed picked in the player (its gear menu); kept for all episodes and launches. */
+    var playbackSpeed: Float
+        get() = sp.getFloat("playback_speed", 1f)
+        set(v) = sp.edit().putFloat("playback_speed", v).apply()
 
     var episodeThumbs: Boolean
         get() = sp.getBoolean("episode_thumbs", false)
@@ -105,25 +115,51 @@ class Prefs(context: Context) {
     fun toggleFavorite(lite: TitleLite): Boolean {
         val list = favorites()
         val existing = list.indexOfFirst { it.id == lite.id }
+        val now = System.currentTimeMillis()
         return if (existing >= 0) {
             list.removeAt(existing)
             saveFavorites(list)
+            putTime(FAV_REMOVED, lite.id, now)
             false
         } else {
             list.add(0, lite)
             saveFavorites(list)
+            putTime(FAV_ADDED, lite.id, now)
             true
         }
     }
 
-    fun syncData(): SyncData = SyncData(favorites(), progressMap(), seenMap())
+    // id → ms of the last add/removal, for sync (see SyncData)
+    private val timesType = object : TypeToken<MutableMap<Int, Long>>() {}.type
 
-    /** Replaces favorites, progress and counters with merged sync data. */
+    private fun times(key: String): MutableMap<Int, Long> =
+        gson.fromJson<MutableMap<Int, Long>>(sp.getString(key, "{}"), timesType) ?: mutableMapOf()
+
+    private fun putTimes(key: String, ids: Collection<Int>, at: Long) {
+        if (ids.isEmpty()) return
+        val map = times(key)
+        ids.forEach { map[it] = at }
+        sp.edit().putString(key, gson.toJson(map)).apply()
+    }
+
+    private fun putTime(key: String, id: Int, at: Long) = putTimes(key, listOf(id), at)
+
+    fun syncData(): SyncData = SyncData(
+        favorites(), progressMap(), seenMap(),
+        favoriteAddedTimes = times(FAV_ADDED),
+        favoriteRemovedTimes = times(FAV_REMOVED),
+        progressRemovedTimes = times(PROGRESS_REMOVED)
+    )
+
+    /** Replaces favorites, progress, counters and add/removal times with merged sync data. */
     fun applySync(d: SyncData) {
         sp.edit()
             .putString("favorites", gson.toJson(d.favorites))
             .putString("progress", gson.toJson(d.progress))
             .putString("seen", gson.toJson(d.seen))
+            .putString(FAV_ADDED, gson.toJson(d.favoriteAddedTimes.orEmpty()))
+            .putString(FAV_REMOVED, gson.toJson(d.favoriteRemovedTimes.orEmpty()))
+            .putString(PROGRESS_REMOVED, gson.toJson(d.progressRemovedTimes.orEmpty()))
             .apply()
     }
 
@@ -148,10 +184,16 @@ class Prefs(context: Context) {
 
     fun removeProgress(id: Int) {
         val map = progressMap()
-        if (map.remove(id) != null) sp.edit().putString("progress", gson.toJson(map)).apply()
+        if (map.remove(id) != null) {
+            sp.edit().putString("progress", gson.toJson(map)).apply()
+            putTime(PROGRESS_REMOVED, id, System.currentTimeMillis())
+        }
     }
 
-    fun clearProgress() = sp.edit().remove("progress").apply()
+    fun clearProgress() {
+        putTimes(PROGRESS_REMOVED, progressMap().keys, System.currentTimeMillis())
+        sp.edit().remove("progress").apply()
+    }
 
     private val seenType = object : TypeToken<MutableMap<Int, Int>>() {}.type
 

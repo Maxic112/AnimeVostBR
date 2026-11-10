@@ -68,7 +68,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.animevostbr.MainActivity
 import com.animevostbr.core.Quality
 import com.animevostbr.core.Repo

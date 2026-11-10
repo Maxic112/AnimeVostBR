@@ -7,6 +7,7 @@ import android.os.Environment
 import android.os.StatFs
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import com.animevostbr.playback.PlaybackRules
 import java.io.File
 
 /** A downloaded (or downloading) episode. `dmId` is the system DownloadManager id. */
@@ -59,7 +60,7 @@ object Downloads {
         val url = when (quality) {
             Quality.FHD -> Repo.playerLinks(item)[Quality.FHD]?.firstOrNull()
                 ?: return "Full HD у этой серии нет — выберите HD"
-            else -> item.url(quality) ?: return "Нет ссылки на видео"
+            else -> item.url(quality)?.let(PlaybackRules::secure) ?: return "Нет ссылки на видео"
         }
         val relative = "${lite.id}/${videoId}_${quality.name}.mp4"
         val file = File(dir, relative)

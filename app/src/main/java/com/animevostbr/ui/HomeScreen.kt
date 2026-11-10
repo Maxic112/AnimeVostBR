@@ -7,9 +7,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -133,12 +133,7 @@ fun HomeScreen(
         }
         message?.let { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() }
     }
-    if (pullState.isRefreshing) {
-        LaunchedEffect(true) {
-            reload()
-            pullState.endRefresh()
-        }
-    }
+    var pullRefreshing by remember { mutableStateOf(false) }
 
     val pagerState = rememberPagerState(pageCount = { 2 })
     val scope = rememberCoroutineScope()
@@ -225,10 +220,25 @@ fun HomeScreen(
                     onRetry = { refresh++ },
                     onOpen = onOpen,
                     onPlay = onPlay
-                ) else Box(
-                    Modifier
-                        .nestedScroll(pullState.nestedScrollConnection)
-                        .clipToBounds() // at rest the indicator hides behind the top edge of the feed
+                ) else PullToRefreshBox(
+                    isRefreshing = pullRefreshing,
+                    onRefresh = {
+                        scope.launch {
+                            pullRefreshing = true
+                            try { reload() } finally { pullRefreshing = false }
+                        }
+                    },
+                    state = pullState,
+                    modifier = Modifier.clipToBounds(), // at rest the indicator hides behind the top edge of the feed
+                    indicator = {
+                        PullToRefreshDefaults.Indicator(
+                            state = pullState,
+                            isRefreshing = pullRefreshing,
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            color = AccentColor,
+                            modifier = Modifier.align(Alignment.TopCenter)
+                        )
+                    }
                 ) {
                     FeedPage(
                         isTv = isTv,
@@ -241,12 +251,6 @@ fun HomeScreen(
                         onRetry = { refresh++ },
                         onOpen = onOpen,
                         onPlay = onPlay
-                    )
-                    if (pullState.progress > 0f || pullState.isRefreshing) PullToRefreshContainer(
-                        state = pullState,
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        contentColor = AccentColor,
-                        modifier = Modifier.align(Alignment.TopCenter)
                     )
                 }
                 else -> ContinuePage(

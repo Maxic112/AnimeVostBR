@@ -1,5 +1,11 @@
 package com.animevostbr.ui
 
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material.icons.filled.Mic
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.compose.rememberLauncherForActivityResult
+import android.speech.RecognizerIntent
+import android.content.Intent
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.LazyColumn
@@ -110,6 +116,22 @@ fun SearchScreen(
         submitted?.let { value = Repo.search(it) } ?: run { value = emptyList() }
     }
 
+    // Voice search: the microphone button on a TV remote or a phone; hidden without a speech recognizer
+    val context = LocalContext.current
+    val voiceIntent = remember {
+        Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+            .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            .putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ru-RU")
+            .putExtra(RecognizerIntent.EXTRA_PROMPT, "Название аниме")
+    }
+    val voiceAvailable = remember { context.packageManager.queryIntentActivities(voiceIntent, 0).isNotEmpty() }
+    val voice = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
+        r.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()?.let {
+            query = it
+            submit()
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -146,6 +168,12 @@ fun SearchScreen(
                         }
                     }
             )
+            if (voiceAvailable) {
+                IconButton(
+                    modifier = Modifier.focusBorder(CircleShape),
+                    onClick = { runCatching { voice.launch(voiceIntent) } }
+                ) { Icon(Icons.Filled.Mic, contentDescription = "Голосовой поиск") }
+            }
         }
 
         when {
@@ -239,10 +267,9 @@ private fun SuggestionRow(title: Title, onClick: () -> Unit) {
             .clickable(onClick = onClick)
             .padding(horizontal = 4.dp, vertical = 6.dp)
     ) {
-        AsyncImage(
-            model = title.poster,
+        PosterImage(
+            url = title.poster,
             contentDescription = null,
-            contentScale = ContentScale.Crop,
             modifier = Modifier
                 .size(width = 40.dp, height = 56.dp)
                 .clip(RoundedCornerShape(4.dp))

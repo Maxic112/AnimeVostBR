@@ -1,5 +1,9 @@
 package com.animevostbr.ui
 
+import com.animevostbr.core.CrashLog
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material.icons.filled.BugReport
+import android.content.Intent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.material3.TextButton
 import java.util.Locale
@@ -122,8 +126,40 @@ fun SettingsScreen(
             if (update != null) UpdateDot(Modifier.padding(end = 8.dp))
             Icon(Icons.Filled.ChevronRight, contentDescription = null)
         }
-        NavRow(Icons.Filled.Sync, "Синхронизация", "Избранное и прогресс между телефоном и телевизором", onSync)
+        NavRow(Icons.Filled.Sync, "Синхронизация и резервная копия", "Между устройствами или в файл", onSync)
         NavRow(Icons.Filled.Download, "Загрузки", "Скачанные серии для просмотра без интернета", onDownloads)
+
+        // after a crash: the report stays on the device until the user shares or deletes it
+        var crash by remember { mutableStateOf(CrashLog.last(context)) }
+        crash?.let { report ->
+            var open by remember { mutableStateOf(false) }
+            NavRow(Icons.Filled.BugReport, "Отчёт об ошибке", "Приложение недавно закрылось с ошибкой — можно отправить разработчику") { open = true }
+            if (open) AlertDialog(
+                onDismissRequest = { open = false },
+                title = { Text("Отчёт об ошибке") },
+                text = {
+                    Text(
+                        text = report.take(1500),
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.verticalScroll(rememberScrollState())
+                    )
+                },
+                confirmButton = {
+                    TextButton(modifier = Modifier.focusBorder(), onClick = {
+                        val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, report)
+                        runCatching { context.startActivity(Intent.createChooser(send, "Отправить отчёт")) }
+                            .onFailure { Toast.makeText(context, "Нет приложения, чтобы поделиться текстом", Toast.LENGTH_LONG).show() }
+                    }) { Text("Поделиться", color = AccentColor) }
+                },
+                dismissButton = {
+                    TextButton(modifier = Modifier.focusBorder(), onClick = {
+                        CrashLog.clear(context)
+                        crash = null
+                        open = false
+                    }) { Text("Удалить") }
+                }
+            )
+        }
 
         SectionTitle(text = "Оформление", modifier = Modifier.padding(top = 16.dp))
         Text(

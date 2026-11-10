@@ -197,6 +197,8 @@ object Repo {
     fun allProgress(): List<Progress> = prefs.allProgress()
     fun saveProgress(p: Progress) = prefs.saveProgress(p)
     fun removeProgress(id: Int) = prefs.removeProgress(id)
+    fun markWatchedThrough(lite: TitleLite, playlist: List<PlaylistItem>, index: Int) =
+        prefs.saveProgress(watchedThrough(lite, playlist, index))
     fun clearProgress() = prefs.clearProgress()
 
     fun seenMap(): Map<Int, Int> = prefs.seenMap()

@@ -1,5 +1,10 @@
 package com.animevostbr.ui
 
+import java.util.Locale
+import java.util.Date
+import java.text.SimpleDateFormat
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -96,6 +101,7 @@ fun SyncScreen(onBack: () -> Unit) {
                     onClick = { mode = SyncMode.CONNECT },
                     modifier = Modifier.focusBorder(RoundedCornerShape(24.dp))
                 ) { Text("Подключиться к другому устройству") }
+                BackupPanel()
             }
             SyncMode.WAIT -> WaitPanel()
             SyncMode.CONNECT -> ConnectPanel()
@@ -105,6 +111,74 @@ fun SyncScreen(onBack: () -> Unit) {
 
 private fun summary(d: SyncData): String =
     "Готово. Избранное: ${d.favorites.size}, начатые тайтлы: ${d.progress.size}."
+
+/**
+  * Backup to a file the user picks (system file picker). Loading merges like a sync, so nothing on the
+  * device is lost. Many TVs have no file picker: the buttons then explain that sync works instead.
+  */
+@Composable
+private fun BackupPanel() {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var status by remember { mutableStateOf<String?>(null) }
+    val noPicker = "На этом устройстве нет выбора файлов — используйте синхронизацию с другим устройством."
+
+    val save = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            status = runCatching {
+                val data = Repo.prefs.syncData()
+                withContext(Dispatchers.IO) {
+                    context.contentResolver.openOutputStream(uri, "wt")!!.use { it.write(Sync.toJson(data).toByteArray(Charsets.UTF_8)) }
+                }
+                "Сохранено. Избранное: ${data.favorites.size}, начатые тайтлы: ${data.progress.size}."
+            }.getOrElse { "Не удалось сохранить файл" }
+        }
+    }
+    val load = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            status = try {
+                val text = withContext(Dispatchers.IO) {
+                    context.contentResolver.openInputStream(uri)!!.use { it.readBytes().toString(Charsets.UTF_8) }
+                }
+                val merged = Sync.merge(Repo.prefs.syncData(), Sync.fromJson(text))
+                Repo.prefs.applySync(merged)
+                "Загружено и объединено. " + summary(merged).removePrefix("Готово. ")
+            } catch (e: Sync.SyncException) {
+                e.message
+            } catch (e: Exception) {
+                "Это не файл резервной копии AnimeVostBR"
+            }
+        }
+    }
+
+    Text(
+        text = "Резервная копия в файл",
+        style = MaterialTheme.typography.titleMedium,
+        modifier = Modifier.padding(top = 20.dp)
+    )
+    Text(
+        text = "Избранное и прогресс в одном файле — на случай переустановки или нового телефона. " +
+            "Загрузка не стирает текущие данные, а объединяет их с файлом.",
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        OutlinedButton(
+            onClick = {
+                val name = "animevostbr-" + SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date()) + ".json"
+                runCatching { save.launch(name) }.onFailure { status = noPicker }
+            },
+            modifier = Modifier.focusBorder(RoundedCornerShape(24.dp))
+        ) { Text("Сохранить в файл") }
+        OutlinedButton(
+            onClick = { runCatching { load.launch(arrayOf("application/json", "text/plain", "application/octet-stream")) }.onFailure { status = noPicker } },
+            modifier = Modifier.focusBorder(RoundedCornerShape(24.dp))
+        ) { Text("Загрузить из файла") }
+    }
+    status?.let { Text(it, style = MaterialTheme.typography.bodyLarge) }
+}
 
 @Composable
 private fun WaitPanel() {

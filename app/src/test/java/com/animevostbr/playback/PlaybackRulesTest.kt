@@ -32,6 +32,19 @@ class PlaybackRulesTest {
     }
 
     @Test
+    fun video_playsOverHttpsThenFallsBackToHttp() {
+        val http = "http://video.animetop.info/720/1.mp4"
+        val https = "https://video.animetop.info/720/1.mp4"
+        assertEquals(https, PlaybackRules.secure(http))
+        assertEquals("https://other.host/1.mp4", PlaybackRules.secure("https://other.host/1.mp4"))
+        assertEquals("file:///x/1.mp4", PlaybackRules.secure("file:///x/1.mp4"))
+        val page = mapOf(Quality.HD to listOf("https://spare/720/1.mp4"))
+        // HTTPS failed: its HTTP twin first, then the player page
+        assertEquals(http, PlaybackRules.nextLink(https, page, Quality.HD, setOf(https)))
+        assertEquals("https://spare/720/1.mp4", PlaybackRules.nextLink(http, page, Quality.HD, setOf(https, http)))
+    }
+
+    @Test
     fun pageStale_afterFiveMinutes() {
         assertTrue(PlaybackRules.pageStale(pageAt = 0L, now = System.currentTimeMillis()))
         assertFalse(PlaybackRules.pageStale(pageAt = 1_000_000L, now = 1_000_000L + 60_000))

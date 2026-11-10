@@ -37,6 +37,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.DownloadDone
 import androidx.compose.material3.AlertDialog
@@ -124,9 +125,25 @@ fun DetailsScreen(
         DownloadDialog(
             label = ep.label,
             existing = existing,
+            hasMarks = progress != null,
             onDismiss = {
                 downloadFor = null
                 pickDownload = false
+            },
+            onMarkWatched = {
+                downloadFor = null
+                pickDownload = false
+                val pl = playlist
+                if (t != null && pl != null) {
+                    Repo.markWatchedThrough(t.toLite(), pl, ep.index)
+                    favTick++
+                }
+            },
+            onClearMarks = {
+                downloadFor = null
+                pickDownload = false
+                Repo.removeProgress(titleId)
+                favTick++
             },
             onDownload = { q ->
                 downloadFor = null
@@ -173,10 +190,9 @@ fun DetailsScreen(
                 }
 
                 Row(Modifier.padding(top = 12.dp)) {
-                    AsyncImage(
-                        model = t.poster,
+                    PosterImage(
+                        url = t.poster,
                         contentDescription = t.title,
-                        contentScale = ContentScale.Crop,
                         modifier = Modifier
                             .width(if (isTv) 230.dp else 130.dp)
                             .aspectRatio(0.7f)
@@ -389,16 +405,16 @@ fun DetailsScreen(
                                     )
                                 }
                             }
-                            // A remote has no obvious long press: this switches clicks on episodes to downloading
+                            // A remote has no obvious long press: this switches clicks on episodes to the actions dialog
                             TextButton(modifier = Modifier.focusBorder(), onClick = { pickDownload = !pickDownload }) {
                                 Icon(
-                                    imageVector = Icons.Filled.Download,
-                                    contentDescription = null,
+                                    imageVector = Icons.Filled.Checklist,
+                                    contentDescription = if (wideScreen) null else "Отметить или скачать серию",
                                     tint = if (pickDownload) AccentColor else MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 // icon only on phones: the label would break into a column of letters
                                 if (wideScreen) Text(
-                                    text = if (pickDownload) "Отмена" else "Скачать серии",
+                                    text = if (pickDownload) "Отмена" else "Отметить / скачать",
                                     color = if (pickDownload) AccentColor else MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.padding(start = 4.dp)
                                 )
@@ -409,10 +425,10 @@ fun DetailsScreen(
                     item {
                         Text(
                             text = when {
-                                pickDownload && wideScreen -> "Выберите серию для загрузки."
-                                pickDownload -> "Выберите серию для загрузки. Отмена — ещё раз нажмите значок загрузки."
-                                wideScreen -> "Чтобы скачать серию для просмотра без интернета, нажмите «Скачать серии» или удерживайте серию."
-                                else -> "Чтобы скачать серию для просмотра без интернета, удерживайте её или нажмите значок загрузки."
+                                pickDownload && wideScreen -> "Выберите серию: отметить просмотренной или скачать."
+                                pickDownload -> "Выберите серию: отметить просмотренной или скачать. Отмена — ещё раз нажмите значок."
+                                wideScreen -> "Отметить серии просмотренными или скачать для просмотра без интернета — кнопка «Отметить / скачать» или удерживайте серию."
+                                else -> "Удерживайте серию, чтобы отметить её просмотренной или скачать."
                             },
                             style = MaterialTheme.typography.labelSmall,
                             color = if (pickDownload) AccentColor else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -673,12 +689,18 @@ private fun TitleHeader(title: String) {
     }
 }
 
-/** Long press on an episode: download it in a chosen quality, or delete the downloaded file. */
+/**
+  * Long press on an episode (or "Episode actions" with a remote): mark it and all earlier ones watched,
+  * clear the marks, download it in a chosen quality or delete the downloaded file.
+  */
 @Composable
 private fun DownloadDialog(
     label: String,
     existing: DownloadState?,
+    hasMarks: Boolean,
     onDismiss: () -> Unit,
+    onMarkWatched: () -> Unit,
+    onClearMarks: () -> Unit,
     onDownload: (Quality) -> Unit,
     onDelete: () -> Unit
 ) {
@@ -687,6 +709,14 @@ private fun DownloadDialog(
         title = { Text(label) },
         text = {
             Column {
+                TextButton(modifier = Modifier.focusBorder(), onClick = onMarkWatched) {
+                    Text("Отметить просмотренной (и все до неё)", color = AccentColor)
+                }
+                if (hasMarks) {
+                    TextButton(modifier = Modifier.focusBorder(), onClick = onClearMarks) {
+                        Text("Снять все отметки просмотра", color = AccentColor)
+                    }
+                }
                 Text(
                     text = when (existing) {
                         DownloadState.DONE -> "Серия скачана и смотрится без интернета."

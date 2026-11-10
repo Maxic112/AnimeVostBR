@@ -71,6 +71,16 @@ data class TitleParts(val ru: String, val en: String, val tags: List<String>) {
     }
 }
 
+/**
+  * Marks episodes up to [index] (1-based playlist position) watched: progress moves to the start of the
+  * next one, or stays on the last episode when there is no next.
+  */
+fun watchedThrough(lite: TitleLite, playlist: List<PlaylistItem>, index: Int): Progress {
+    val next = playlist.firstOrNull { it.index == index + 1 }
+    val target = next ?: playlist.firstOrNull { it.index == index }
+    return Progress(lite, target?.index ?: index, 0L, 0L, target?.label)
+}
+
 /** `episode` is the playlist position, not the number from the episode name. */
 data class Progress(
     val lite: TitleLite,
@@ -173,6 +183,18 @@ object TitlesParser {
       */
     fun posterUrl(url: String): String =
         if (url.startsWith("https://static.openni.ru/", ignoreCase = true)) "http://" + url.substring(8) else url
+
+    private val UPLOADS = Regex("""^https?://[^/]+(/uploads/.+)$""", RegexOption.IGNORE_CASE)
+
+    /**
+      * Spare addresses of a poster, tried in order after [posterUrl] fails: static.openni.ru serves plain
+      * HTTP only and some networks block it, while the site mirror and the main site keep the same
+      * `/uploads/…` files over HTTPS.
+      */
+    fun posterFallbacks(url: String, mirrorHost: String): List<String> {
+        val path = UPLOADS.find(url)?.groupValues?.get(1) ?: return emptyList()
+        return listOf("https://$mirrorHost$path", "https://animevost.org$path").filter { it != url }
+    }
 
     /**
       * `series` is NOT JSON but a Python dict literal with single quotes:

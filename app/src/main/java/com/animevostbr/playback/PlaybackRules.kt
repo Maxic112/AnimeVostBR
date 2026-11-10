@@ -29,6 +29,22 @@ object PlaybackRules {
     fun spareLink(page: Map<Quality, List<String>>, quality: Quality, tried: Set<String>): String? =
         page[quality]?.firstOrNull { it !in tried }
 
+    private const val VIDEO_HTTP = "http://video.animetop.info/"
+    private const val VIDEO_HTTPS = "https://video.animetop.info/"
+
+    /**
+      * The API gives plain-HTTP video links. Some mobile operators tamper with unencrypted traffic, so the
+      * video host is played over HTTPS (it supports both).
+      */
+    fun secure(url: String): String =
+        if (url.startsWith(VIDEO_HTTP)) VIDEO_HTTPS + url.removePrefix(VIDEO_HTTP) else url
+
+    /** After a failure: the plain-HTTP twin of an HTTPS video link first, then the player page links. */
+    fun nextLink(failed: String?, page: Map<Quality, List<String>>, quality: Quality, tried: Set<String>): String? {
+        val twin = failed?.takeIf { it.startsWith(VIDEO_HTTPS) }?.let { VIDEO_HTTP + it.removePrefix(VIDEO_HTTPS) }
+        return twin?.takeIf { it !in tried } ?: spareLink(page, quality, tried)
+    }
+
     sealed interface Fallback {
         /** [remember]: keep the quality for the next episodes of the title. */
         data class Lower(val quality: Quality, val url: String, val remember: Boolean) : Fallback

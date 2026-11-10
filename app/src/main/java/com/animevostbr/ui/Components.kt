@@ -32,6 +32,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -47,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.animevostbr.core.Title
 import com.animevostbr.core.TitleLite
+import com.animevostbr.core.Sites
 import com.animevostbr.core.TitlesParser
 import java.util.Locale
 
@@ -89,10 +91,9 @@ fun PosterCard(
                 .background(Color(0xFF101014)),
             contentAlignment = Alignment.Center
         ) {
-            AsyncImage(
-                model = title.poster,
+            PosterImage(
+                url = title.poster,
                 contentDescription = title.title,
-                contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()
             )
             if (isFavorite) {
@@ -163,11 +164,10 @@ fun RowCard(
             .combinedClickable(onClick = onClick, onLongClick = onLongClick)
             .padding(8.dp)
     ) {
-        AsyncImage(
-            // favorites/progress may still hold old https links to static.openni.ru
-            model = TitlesParser.posterUrl(lite.poster),
+        // favorites/progress may still hold old https links to static.openni.ru; PosterImage maps them
+        PosterImage(
+            url = lite.poster,
             contentDescription = lite.title,
-            contentScale = ContentScale.Crop,
             modifier = Modifier
                 .size(width = 64.dp, height = 90.dp)
                 .clip(RoundedCornerShape(6.dp))
@@ -195,6 +195,25 @@ fun RowCard(
         }
         trailing?.invoke()
     }
+}
+
+/** A poster that moves on to the spare addresses ([TitlesParser.posterFallbacks]) when one fails. */
+@Composable
+fun PosterImage(
+    url: String,
+    contentDescription: String?,
+    modifier: Modifier = Modifier,
+    contentScale: ContentScale = ContentScale.Crop
+) {
+    val candidates = remember(url) { listOf(TitlesParser.posterUrl(url)) + TitlesParser.posterFallbacks(url, Sites.mirrorHost) }
+    var index by remember(url) { mutableIntStateOf(0) }
+    AsyncImage(
+        model = candidates[index],
+        contentDescription = contentDescription,
+        contentScale = contentScale,
+        modifier = modifier,
+        onError = { if (index < candidates.lastIndex) index++ }
+    )
 }
 
 /** Average rating over the poster, e.g. "★ 4,3". */

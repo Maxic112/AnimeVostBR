@@ -14,6 +14,7 @@ import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.animevostbr.core.AppUpdate
+import com.animevostbr.core.CrashLog
 import com.animevostbr.core.Repo
 import com.animevostbr.notify.AppUpdateWorker
 import com.animevostbr.notify.UpdateWorker
@@ -24,6 +25,7 @@ class AnimeVostApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        CrashLog.install(this, runCatching { packageManager.getPackageInfo(packageName, 0).versionName }.getOrNull().orEmpty())
         Repo.init(this)
         UiState.themeMode = Repo.prefs.themeMode
 

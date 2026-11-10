@@ -163,10 +163,9 @@ private fun TitleRow(
                     .clip(RoundedCornerShape(8.dp))
                     .background(Color(0xFF101014))
             ) {
-                AsyncImage(
-                    model = t.poster,
+                PosterImage(
+                    url = t.poster,
                     contentDescription = parts.ru,
-                    contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
                 )
             }

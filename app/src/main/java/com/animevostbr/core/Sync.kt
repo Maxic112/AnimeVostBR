@@ -1,6 +1,7 @@
 package com.animevostbr.core
 
 import com.google.gson.Gson
+import com.google.gson.JsonParser
 import java.io.BufferedInputStream
 import java.io.IOException
 import java.io.InputStream
@@ -12,12 +13,20 @@ import java.net.SocketTimeoutException
 import java.net.URL
 import java.security.SecureRandom
 
-/** What two devices exchange: favorites, watch progress and the new-episode counters. */
+/**
+  * What two devices exchange and what a backup file holds: favorites, watch progress and the
+  * new-episode counters. The `*Times` maps (id → ms) say when a favorite was added and when a favorite or
+  * a progress record was removed, so a removal on one device wins over an older copy on the other.
+  * They are null in data from 1.8, which has no such fields.
+  */
 data class SyncData(
     val favorites: List<TitleLite> = emptyList(),
     val progress: Map<Int, Progress> = emptyMap(),
     val seen: Map<Int, Int> = emptyMap(),
-    val version: Int = Sync.VERSION
+    val version: Int = Sync.VERSION,
+    val favoriteAddedTimes: Map<Int, Long>? = null,
+    val favoriteRemovedTimes: Map<Int, Long>? = null,
+    val progressRemovedTimes: Map<Int, Long>? = null
 )
 
 /**
@@ -42,20 +51,53 @@ object Sync {
 
     fun newCode(): String = (0 until 6).joinToString("") { random.nextInt(10).toString() }
 
+    /** Removals older than this are forgotten; a device unsynced for longer may bring the item back. */
+    const val REMOVAL_KEEP_MS = 90L * 24 * 60 * 60 * 1000
+
     /**
-      * Union of favorites; for each title the progress watched most recently; the higher new-episode
-      * counter. A favorite removed on one device comes back from the other: removals are not tracked.
+      * For each title the latest action wins: added vs removed for favorites, watched vs removed for
+      * progress. Favorites added before 1.9 have no time and lose to any removal. New-episode counters
+      * take the higher value.
       */
-    fun merge(a: SyncData, b: SyncData): SyncData {
+    fun merge(a: SyncData, b: SyncData, now: Long = System.currentTimeMillis()): SyncData {
+        fun latest(x: Map<Int, Long>?, y: Map<Int, Long>?): Map<Int, Long> =
+            ((x?.keys ?: emptySet()) + (y?.keys ?: emptySet()))
+                .associateWith { maxOf(x?.get(it) ?: 0L, y?.get(it) ?: 0L) }
+                .filterValues { now - it < REMOVAL_KEEP_MS }
+
+        val added = latest(a.favoriteAddedTimes, b.favoriteAddedTimes)
+        val favRemoved = latest(a.favoriteRemovedTimes, b.favoriteRemovedTimes)
+        val progRemoved = latest(a.progressRemovedTimes, b.progressRemovedTimes)
+
         val favorites = (a.favorites + b.favorites).distinctBy { it.id }
+            .filter { (added[it.id] ?: 0L) > (favRemoved[it.id] ?: -1L) }
         val progress = (a.progress.keys + b.progress.keys).associateWith { id ->
             listOfNotNull(a.progress[id], b.progress[id]).maxBy { it.updatedAt }
-        }
+        }.filter { (id, p) -> p.updatedAt > (progRemoved[id] ?: -1L) }
         val seen = (a.seen.keys + b.seen.keys).associateWith { maxOf(a.seen[it] ?: 0, b.seen[it] ?: 0) }
-        return SyncData(favorites, progress, seen)
+        return SyncData(
+            favorites, progress, seen,
+            favoriteAddedTimes = added.filterKeys { id -> favorites.any { it.id == id } },
+            favoriteRemovedTimes = favRemoved,
+            progressRemovedTimes = progRemoved
+        )
     }
 
     class SyncException(message: String) : IOException(message)
+
+    /** Backup file: the same JSON as sync. */
+    fun toJson(data: SyncData): String = gson.toJson(data)
+
+    /** Gson fills missing fields with the defaults, so a foreign JSON is recognised by its keys. */
+    fun fromJson(text: String): SyncData {
+        val obj = runCatching { JsonParser.parseString(text).asJsonObject }.getOrNull()
+        if (obj == null || !obj.has("version") || !obj.has("favorites") || !obj.has("progress")) {
+            throw SyncException("Это не файл резервной копии AnimeVostBR")
+        }
+        val data = gson.fromJson(obj, SyncData::class.java)
+        if (data.version != VERSION) throw SyncException("Файл от другой версии приложения — обновите приложение")
+        return data
+    }
 
     /** The connecting side: sends [local], returns the merged data to keep. */
     fun exchange(host: String, port: Int, code: String, local: SyncData, timeoutMs: Int = 10_000): SyncData {

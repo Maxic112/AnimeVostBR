@@ -21,7 +21,9 @@ import urllib.parse
 import urllib.request
 
 UA = "AnimeVostBR/1.0 (Android; client)"
-API = "https://api.animevost.org/v1"
+# The same API on two domains and servers; the app tries them in this order (ApiClient.API_HOSTS)
+API_HOSTS = ["api.animetop.info", "api.animevost.org"]
+API = f"https://{API_HOSTS[0]}/v1"
 MAIN = "animevost.org"
 DEFAULT_MIRROR = "v14.vost.pw"
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -72,6 +74,21 @@ def need_fields(obj, fields, where):
     missing = [f for f in fields if f not in obj]
     if missing:
         raise ValueError(f"{where}: нет полей {missing} — сменился формат API")
+
+
+def check_api_host(host):
+    """Both addresses must keep serving the API: the app falls back from one to the other."""
+    req = urllib.request.Request(f"https://{host}/v1/last?page=1&quantity=1", headers={"User-Agent": UA})
+    try:
+        with urllib.request.urlopen(req, timeout=15) as r:
+            ctype = r.headers.get("Content-Type", "")
+            if "json" not in ctype:
+                return WARN, f"HTTP {r.status}, {ctype or 'без Content-Type'} — не похоже на API"
+            return OK, "отвечает"
+    except urllib.error.HTTPError as e:
+        return WARN, f"HTTP {e.code}"
+    except Exception as e:
+        return WARN, f"{type(e).__name__}: {e}"
 
 
 def check_last():
@@ -260,6 +277,8 @@ def check_player_page():
 def main():
     quiet = "--quiet" in sys.argv
     r = Report()
+    for host in API_HOSTS:
+        r.run(f"API-сервер {host}", lambda h=host: check_api_host(h))
     r.run("API: лента /v1/last", check_last)
     r.run("API: серии /v1/playlist", check_playlist)
     r.run("API: карточка /v1/info", check_info)
