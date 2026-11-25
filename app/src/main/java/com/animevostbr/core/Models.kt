@@ -72,14 +72,11 @@ data class TitleParts(val ru: String, val en: String, val tags: List<String>) {
 }
 
 /**
-  * Marks episodes up to [index] (1-based playlist position) watched: progress moves to the start of the
-  * next one, or stays on the last episode when there is no next.
+  * Marks episodes up to [index] (1-based playlist position) watched. Position 0 means "finished", the
+  * same record the player saves at the end of an episode, so Watch then offers the next one.
   */
-fun watchedThrough(lite: TitleLite, playlist: List<PlaylistItem>, index: Int): Progress {
-    val next = playlist.firstOrNull { it.index == index + 1 }
-    val target = next ?: playlist.firstOrNull { it.index == index }
-    return Progress(lite, target?.index ?: index, 0L, 0L, target?.label)
-}
+fun watchedThrough(lite: TitleLite, playlist: List<PlaylistItem>, index: Int): Progress =
+    Progress(lite, index, 0L, 0L, playlist.firstOrNull { it.index == index }?.label)
 
 /** `episode` is the playlist position, not the number from the episode name. */
 data class Progress(

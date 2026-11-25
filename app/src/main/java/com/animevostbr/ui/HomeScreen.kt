@@ -137,6 +137,10 @@ fun HomeScreen(
 
     val pagerState = rememberPagerState(pageCount = { 2 })
     val scope = rememberCoroutineScope()
+    // TV has no pager: since Compose 1.7 a remote press past the edge of the feed moved focus
+    // into the next pager page and switched the tab to "Continue"
+    var tvTab by rememberSaveable { mutableStateOf(0) }
+    val currentTab = if (isTv) tvTab else pagerState.currentPage
 
     Column(
         modifier = Modifier
@@ -183,7 +187,7 @@ fun HomeScreen(
         }
 
         TabRow(
-            selectedTabIndex = pagerState.currentPage,
+            selectedTabIndex = currentTab,
             containerColor = MaterialTheme.colorScheme.background,
             contentColor = AccentColor,
             modifier = Modifier
@@ -198,15 +202,15 @@ fun HomeScreen(
             titles.forEachIndexed { i, title ->
                 Tab(
                     modifier = Modifier.focusBorder(),
-                    selected = pagerState.currentPage == i,
-                    onClick = { scope.launch { pagerState.animateScrollToPage(i) } },
+                    selected = currentTab == i,
+                    onClick = { if (isTv) tvTab = i else scope.launch { pagerState.animateScrollToPage(i) } },
                     text = { Text(title) },
                     unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
 
-        HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
+        val pageContent: @Composable (Int) -> Unit = { page ->
             when (page) {
                 // TV: the header button refreshes; remote scrolling would leave the pull indicator hanging
                 0 -> if (isTv) FeedPage(
@@ -267,6 +271,8 @@ fun HomeScreen(
                 )
             }
         }
+        if (isTv) Box(Modifier.fillMaxSize()) { pageContent(tvTab) }
+        else HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { pageContent(it) }
     }
 }
 

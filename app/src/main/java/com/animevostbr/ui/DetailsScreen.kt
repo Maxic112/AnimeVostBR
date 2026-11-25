@@ -89,15 +89,22 @@ fun DetailsScreen(
     onBack: () -> Unit,
     onPlay: (Int, Int) -> Unit
 ) {
-    val title by produceState<Title?>(
-        initialValue = Repo.lastCached.firstOrNull { it.id == titleId },
-        key1 = titleId
-    ) {
-        value = Repo.titleById(titleId) ?: value
+    val context = LocalContext.current
+    var reloadTick by remember { mutableStateOf(0) }
+    var titleFailed by remember { mutableStateOf(false) }
+    val title by produceState(Repo.lastCached.firstOrNull { it.id == titleId }, titleId, reloadTick) {
+        titleFailed = false
+        // offline: what favorites, progress or downloads know about the title, so downloads stay reachable
+        value = Repo.titleById(titleId) ?: value ?: withContext(Dispatchers.IO) { savedTitle(context, titleId) }
+        titleFailed = value == null
     }
 
-    val playlist by produceState<List<PlaylistItem>?>(initialValue = null, key1 = titleId) {
-        value = Repo.playlist(titleId)
+    // offline: the downloaded episodes
+    val playlist by produceState<List<PlaylistItem>?>(null, titleId, reloadTick) {
+        value = null
+        value = Repo.playlist(titleId).ifEmpty {
+            withContext(Dispatchers.IO) { Downloads.offlinePlaylist(context, titleId) }
+        }
     }
 
     var favTick by remember { mutableStateOf(0) }
@@ -107,7 +114,6 @@ fun DetailsScreen(
     var thumbs by remember { mutableStateOf(Repo.prefs.episodeThumbs) }
 
     // Downloads of this title by video id; long press on an episode opens the download dialog
-    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var downloadsTick by remember { mutableStateOf(0) }
     val downloads by produceState(emptyMap<String, DownloadState>(), titleId, downloadsTick) {
@@ -172,6 +178,10 @@ fun DetailsScreen(
 
     val t = title
     when {
+        t == null && titleFailed -> ErrorBox(
+            message = "Не удалось загрузить тайтл.\nПроверьте подключение к интернету.",
+            onRetry = { reloadTick++ }
+        )
         t == null -> LoadingBox(message = "Загружаем информацию…")
         else -> LazyColumn(
             modifier = Modifier
@@ -264,13 +274,14 @@ fun DetailsScreen(
                         val pl = playlist
                         if (!pl.isNullOrEmpty()) {
                             // started episode → resume; finished → next one; otherwise the first
-                            val resume = progress?.takeIf { it.positionMs > 0 && it.episode in 1..pl.size }
-                            val next = progress?.takeIf { it.positionMs == 0L }?.episode?.plus(1)?.takeIf { it <= pl.size }
-                            val ep = resume?.episode ?: next ?: 1
+                            // offline the list holds only downloaded episodes, so look them up by index
+                            val resume = progress?.takeIf { p -> p.positionMs > 0 && pl.any { it.index == p.episode } }
+                            val next = progress?.takeIf { it.positionMs == 0L }?.let { p -> pl.firstOrNull { it.index > p.episode } }
+                            val ep = resume?.episode ?: next?.index ?: pl.first().index
                             val action = if (resume != null) "Продолжить" else "Смотреть"
                             // the second line names the episode: a single line does not fit on phones
                             val detail = if (resume != null) "${resume.episodeLabel()} · ${formatMs(resume.positionMs)}"
-                            else pl[ep - 1].label
+                            else pl.first { it.index == ep }.label
                             Button(
                                 onClick = { onPlay(t.id, ep) },
                                 modifier = Modifier
@@ -375,11 +386,12 @@ fun DetailsScreen(
 
                 pl.isEmpty() -> item {
                     Text(
-                        text = "Серии не найдены. Возможно, тайтл ещё не озвучен или временно недоступен.",
+                        text = "Серии не найдены. Возможно, тайтл ещё не озвучен, временно недоступен или нет интернета.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 8.dp)
                     )
+                    TextButton(modifier = Modifier.focusBorder(), onClick = { reloadTick++ }) { Text("Повторить") }
                 }
 
                 else -> {
@@ -530,6 +542,15 @@ private fun EpisodeRow(
         }
         DownloadMark(download)
     }
+}
+
+/** The title as the device keeps it (favorites, progress, downloads) when it cannot be fetched. */
+private fun savedTitle(context: android.content.Context, id: Int): Title? {
+    val lite = Repo.favorites().firstOrNull { it.id == id }
+        ?: Repo.progress(id)?.lite?.takeIf { it.title.isNotBlank() }
+        ?: Downloads.records(context).firstOrNull { it.lite.id == id }?.lite
+        ?: return null
+    return Title(id = lite.id, title = lite.title, poster = lite.poster, year = lite.year, type = lite.type)
 }
 
 private val timerFormat = SimpleDateFormat("d MMMM, HH:mm", Locale("ru"))

@@ -10,6 +10,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.remember
+import androidx.lifecycle.Lifecycle
 import com.animevostbr.core.AppUpdate
 import com.animevostbr.core.Catalog
 import com.animevostbr.core.CatalogKind
@@ -18,6 +19,12 @@ import com.animevostbr.playback.PlayerViewModel
 @Composable
 fun AppNav(isTv: Boolean, openTitleId: Int?, onTitleOpened: () -> Unit) {
     val nav = rememberNavController()
+
+    // A second press while the screen is already changing (a double tap, a laggy remote) is dropped:
+    // it opened the player twice, and the hidden one kept playing.
+    fun ready() = nav.currentBackStackEntry?.lifecycle?.currentState == Lifecycle.State.RESUMED
+    fun go(route: String) { if (ready()) nav.navigate(route) }
+    fun back() { if (ready()) nav.popBackStack() }
 
     val context = LocalContext.current
     LaunchedEffect(Unit) {
@@ -36,29 +43,29 @@ fun AppNav(isTv: Boolean, openTitleId: Int?, onTitleOpened: () -> Unit) {
         composable("home") {
             HomeScreen(
                 isTv = isTv,
-                onOpen = { id -> nav.navigate("details/$id") },
-                onPlay = { id, ep -> nav.navigate("player/$id/$ep") },
-                onSearch = { nav.navigate("search") },
-                onSchedule = { nav.navigate("schedule") },
-                onFavorites = { nav.navigate("favorites") },
-                onSettings = { nav.navigate("settings") }
+                onOpen = { id -> go("details/$id") },
+                onPlay = { id, ep -> go("player/$id/$ep") },
+                onSearch = { go("search") },
+                onSchedule = { go("schedule") },
+                onFavorites = { go("favorites") },
+                onSettings = { go("settings") }
             )
         }
 
         composable("schedule") {
             ScheduleScreen(
-                onOpen = { id -> nav.navigate("details/$id") },
-                onBack = { nav.popBackStack() }
+                onOpen = { id -> go("details/$id") },
+                onBack = ::back
             )
         }
 
         composable("search") {
             SearchScreen(
                 isTv = isTv,
-                onOpen = { id -> nav.navigate("details/$id") },
-                onPlay = { id, ep -> nav.navigate("player/$id/$ep") },
-                onCatalog = { f -> nav.navigate("catalog/${f.kind.name}/${f.slug}") },
-                onBack = { nav.popBackStack() }
+                onOpen = { id -> go("details/$id") },
+                onPlay = { id, ep -> go("player/$id/$ep") },
+                onCatalog = { f -> go("catalog/${f.kind.name}/${f.slug}") },
+                onBack = ::back
             )
         }
 
@@ -75,46 +82,46 @@ fun AppNav(isTv: Boolean, openTitleId: Int?, onTitleOpened: () -> Unit) {
             CatalogScreen(
                 isTv = isTv,
                 filter = filter,
-                onOpen = { id -> nav.navigate("details/$id") },
-                onPlay = { id, ep -> nav.navigate("player/$id/$ep") },
-                onBack = { nav.popBackStack() }
+                onOpen = { id -> go("details/$id") },
+                onPlay = { id, ep -> go("player/$id/$ep") },
+                onBack = ::back
             )
         }
 
         composable("favorites") {
             FavoritesScreen(
-                onOpen = { id -> nav.navigate("details/$id") },
-                onBack = { nav.popBackStack() }
+                onOpen = { id -> go("details/$id") },
+                onBack = ::back
             )
         }
 
         composable("settings") {
             SettingsScreen(
-                onBack = { nav.popBackStack() },
-                onDiagnostics = { nav.navigate("diagnostics") },
-                onUpdate = { nav.navigate("update") },
-                onSync = { nav.navigate("sync") },
-                onDownloads = { nav.navigate("downloads") }
+                onBack = ::back,
+                onDiagnostics = { go("diagnostics") },
+                onUpdate = { go("update") },
+                onSync = { go("sync") },
+                onDownloads = { go("downloads") }
             )
         }
 
         composable("sync") {
-            SyncScreen(onBack = { nav.popBackStack() })
+            SyncScreen(onBack = ::back)
         }
 
         composable("downloads") {
             DownloadsScreen(
-                onPlay = { id, ep -> nav.navigate("player/$id/$ep") },
-                onBack = { nav.popBackStack() }
+                onPlay = { id, ep -> go("player/$id/$ep") },
+                onBack = ::back
             )
         }
 
         composable("update") {
-            UpdateScreen(onBack = { nav.popBackStack() })
+            UpdateScreen(onBack = ::back)
         }
 
         composable("diagnostics") {
-            DiagnosticsScreen(onBack = { nav.popBackStack() })
+            DiagnosticsScreen(onBack = ::back)
         }
 
         composable(
@@ -125,8 +132,8 @@ fun AppNav(isTv: Boolean, openTitleId: Int?, onTitleOpened: () -> Unit) {
             DetailsScreen(
                 isTv = isTv,
                 titleId = id,
-                onBack = { nav.popBackStack() },
-                onPlay = { tid, ep -> nav.navigate("player/$tid/$ep") }
+                onBack = ::back,
+                onPlay = { tid, ep -> go("player/$tid/$ep") }
             )
         }
 
@@ -138,7 +145,7 @@ fun AppNav(isTv: Boolean, openTitleId: Int?, onTitleOpened: () -> Unit) {
             )
         ) {
             val vm: PlayerViewModel = viewModel()
-            PlayerScreen(vm = vm, onBack = { nav.popBackStack() })
+            PlayerScreen(vm = vm, onBack = ::back)
         }
     }
 }

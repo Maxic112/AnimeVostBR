@@ -25,8 +25,10 @@ import com.animevostbr.core.Progress
 import com.animevostbr.core.Quality
 import com.animevostbr.core.Repo
 import com.animevostbr.core.TitleLite
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
   * Owns the ExoPlayer instance, the episode list, quality and watch progress.
@@ -131,19 +133,38 @@ class PlayerViewModel(
                 Repo.prefs.playbackSpeed = params.speed
             }
         })
+        loadPlaylist()
+    }
+
+    /** Without the network only the downloaded episodes are listed, so indexes may have gaps. */
+    private fun loadPlaylist() {
         viewModelScope.launch {
-            items = Repo.playlist(titleId)
-            if (items.isEmpty()) {
+            items = Repo.playlist(titleId).ifEmpty {
+                withContext(Dispatchers.IO) { Downloads.offlinePlaylist(getApplication(), titleId) }
+            }
+            val first = items.firstOrNull()
+            if (first == null) {
                 error = "Не удалось загрузить серии.\nПроверьте подключение к интернету."
             } else {
                 // a stale progress record may point past the end of the playlist
-                playEpisode(startEp.coerceIn(1, items.size))
+                val start = itemFor(startEp) ?: if (startEp > items.last().index) items.last() else first
+                playEpisode(start.index)
             }
         }
     }
 
+    /** "Retry" on the error screen: the episode list again if it failed, otherwise the episode from where it stopped. */
+    fun retry() {
+        error = null
+        if (items.isEmpty()) loadPlaylist()
+        else playEpisode(currentEp, player.currentPosition.takeIf { it > 0 })
+    }
+
     /** `ep` is the 1-based playlist position. */
-    fun itemFor(ep: Int): PlaylistItem? = items.getOrNull(ep - 1)
+    fun itemFor(ep: Int): PlaylistItem? = items.firstOrNull { it.index == ep }
+
+    private fun nextItem(): PlaylistItem? = items.firstOrNull { it.index > currentEp }
+    private fun prevItem(): PlaylistItem? = items.lastOrNull { it.index < currentEp }
 
     val currentLabel: String get() = itemFor(currentEp)?.label ?: "Серия $currentEp"
 
@@ -164,8 +185,8 @@ class PlayerViewModel(
         }
         currentEp = item.index
         error = null
-        hasNext = itemFor(item.index + 1) != null
-        hasPrev = itemFor(item.index - 1) != null
+        hasNext = nextItem() != null
+        hasPrev = prevItem() != null
         val start = startMs ?: if (item.index == startEp && resumeMs > 0) resumeMs else 0L
         linkJob?.cancel()
         pageLinks = emptyMap()
@@ -270,18 +291,16 @@ class PlayerViewModel(
     }
 
     fun next() {
-        val nextEp = currentEp + 1
-        if (itemFor(nextEp) != null) {
+        nextItem()?.let {
             resumeMs = 0L
-            playEpisode(nextEp)
+            playEpisode(it.index)
         }
     }
 
     fun prev() {
-        val prevEp = currentEp - 1
-        if (itemFor(prevEp) != null) {
+        prevItem()?.let {
             resumeMs = 0L
-            playEpisode(prevEp)
+            playEpisode(it.index)
         }
     }
 
@@ -312,6 +331,7 @@ class PlayerViewModel(
             ?: Repo.lastCached.firstOrNull { it.id == titleId }?.toLite()
             ?: Repo.favorites().firstOrNull { it.id == titleId }
             ?: Repo.progress(titleId)?.lite
+            ?: Downloads.records(getApplication()).firstOrNull { it.lite.id == titleId }?.lite
             ?: TitleLite(titleId, "", "")
 
         val pos = player.currentPosition.coerceIn(0, dur)

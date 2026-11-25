@@ -146,7 +146,7 @@ private fun TitleRow(
             modifier = modifier
                 .fillMaxWidth()
                 // Down goes to Watch: by geometry the remote would pick the heart, the nearer one.
-                // Nothing is to the right in a list; without Cancel the home pager switches tabs.
+                // Nothing is to the right in a list: Right stays put.
                 .focusProperties {
                     down = playFocus
                     right = FocusRequester.Cancel

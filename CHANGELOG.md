@@ -4,6 +4,23 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/).
 
+## [1.9.1] - 2026-11-25
+
+### Fixed
+- Android TV: moving through "New" with the remote kept switching to the "Continue" tab and back, so
+  the screen flickered. Since the Compose update in 1.9.0 a press past the edge of the feed moved
+  focus into the next tab page; on TV the tabs now switch only when a tab is selected.
+- "Mark watched" was one episode off: marking episode 2 recorded episode 3 as finished, so the title
+  page offered the wrong episode to watch. Marks made in 1.9.0 stay as they are; mark again to fix.
+- Downloaded episodes did not play without the internet: the player needed the episode list from the
+  network. Offline the title page and the player now list the downloaded episodes.
+- A title page that could not be loaded kept spinning forever; it now shows what the device knows about
+  the title (from favorites, progress or downloads) or an error with "Retry".
+- "Retry" in the player did nothing when the episode list had failed to load; it also resumes from
+  where the video stopped instead of the start.
+- A quick double press (or a laggy remote) opened a screen twice: two players, the hidden one still
+  playing. Presses while a screen is changing are ignored now.
+
 ## [1.9.0] - 2026-11-10
 
 ### Fixed

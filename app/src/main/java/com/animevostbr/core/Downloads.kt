@@ -117,6 +117,18 @@ object Downloads {
         return if (s.state == DownloadState.DONE) File(r.path) to r.quality else null
     }
 
+    /**
+      * The finished downloads of a title as a playlist, for when the episode list cannot be fetched
+      * (no network). The link only carries the video id: the player plays the file itself.
+      */
+    fun offlinePlaylist(context: Context, titleId: Int): List<PlaylistItem> =
+        statuses(context)
+            .filter { it.record.lite.id == titleId && it.state == DownloadState.DONE }
+            .map { it.record }
+            .distinctBy { it.index }
+            .sortedBy { it.index }
+            .map { PlaylistItem(it.index, it.label, hd = null, sd = "file:///${it.videoId}.mp4") }
+
     /** Cancels or deletes: the system removes the file together with its entry. */
     fun remove(context: Context, record: DownloadRecord) {
         runCatching { manager(context).remove(record.dmId) }

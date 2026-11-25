@@ -449,7 +449,7 @@ fun PlayerScreen(vm: PlayerViewModel, onBack: () -> Unit) {
                             modifier = Modifier
                                 .focusRequester(retryFocus)
                                 .focusBorder(),
-                            onClick = { vm.playEpisode(vm.currentEp) }
+                            onClick = { vm.retry() }
                         ) {
                             Text("Повторить", color = Color.White)
                         }
