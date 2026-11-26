@@ -307,9 +307,9 @@ val AccentColor: Color
   * visible from a couch. Buttons get no focus in touch mode, so phones never show it.
   * Apply before `clickable` in the modifier chain.
   */
-fun Modifier.focusBorder(shape: Shape = RoundedCornerShape(10.dp)): Modifier = composed {
+fun Modifier.focusBorder(shape: Shape = RoundedCornerShape(10.dp), color: Color? = null): Modifier = composed {
     var focused by remember { mutableStateOf(false) }
-    val color = AccentColor
+    val color = color ?: AccentColor
     onFocusChanged { focused = it.hasFocus }
         .then(if (focused) Modifier.border(3.dp, color, shape) else Modifier)
 }

@@ -17,6 +17,22 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.ui.text.input.ImeAction
+import androidx.activity.compose.BackHandler
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.focus.FocusManager
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.composed
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -60,6 +76,8 @@ private enum class SyncMode { CHOOSE, WAIT, CONNECT }
 @Composable
 fun SyncScreen(onBack: () -> Unit) {
     var mode by remember { mutableStateOf(SyncMode.CHOOSE) }
+    // Back on the remote returns to the choice first, like the arrow on screen
+    BackHandler(enabled = mode != SyncMode.CHOOSE) { mode = SyncMode.CHOOSE }
 
     Column(
         modifier = Modifier
@@ -89,13 +107,15 @@ fun SyncScreen(onBack: () -> Unit) {
         when (mode) {
             SyncMode.CHOOSE -> Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
-                    text = "На одном устройстве нажмите «Показать код», на другом — «Подключиться».",
+                    text = "На одном устройстве нажмите «Показать код», на другом — «Подключиться»." +
+                        if (UiState.tvMode) " С пультом проще показать код здесь, а ввести его на телефоне." else "",
                     style = MaterialTheme.typography.bodyMedium
                 )
                 Button(
                     onClick = { mode = SyncMode.WAIT },
                     colors = ButtonDefaults.buttonColors(containerColor = AccentColor),
-                    modifier = Modifier.focusBorder(RoundedCornerShape(24.dp))
+                    // an accent border on an accent button is invisible
+                    modifier = Modifier.focusBorder(RoundedCornerShape(24.dp), color = Color.White)
                 ) { Text("Показать код на этом устройстве") }
                 OutlinedButton(
                     onClick = { mode = SyncMode.CONNECT },
@@ -106,6 +126,35 @@ fun SyncScreen(onBack: () -> Unit) {
             SyncMode.WAIT -> WaitPanel()
             SyncMode.CONNECT -> ConnectPanel()
         }
+    }
+}
+
+/**
+  * Remote: a text field keeps Up/Down for its cursor, and the focus search from a text field skips a narrow
+  * button below it, so the Sync button was unreachable. Up/Down leave the field for [up]/[down], or the
+  * nearest element when not given. Focus moves on the release of an arrow pressed inside the field: the
+  * release of the press that brought focus here must not move it on.
+  */
+private fun Modifier.leaveOnArrows(
+    focusManager: FocusManager,
+    up: FocusRequester? = null,
+    down: FocusRequester? = null
+): Modifier = composed {
+    var pressed by remember { mutableStateOf<Key?>(null) }
+    onPreviewKeyEvent { e ->
+        val (direction, target) = when (e.key) {
+            Key.DirectionDown -> FocusDirection.Down to down
+            Key.DirectionUp -> FocusDirection.Up to up
+            else -> return@onPreviewKeyEvent false
+        }
+        when (e.type) {
+            KeyEventType.KeyDown -> pressed = e.key
+            KeyEventType.KeyUp -> if (pressed == e.key) {
+                pressed = null
+                if (target != null) runCatching { target.requestFocus() } else focusManager.moveFocus(direction)
+            }
+        }
+        true
     }
 }
 
@@ -261,6 +310,42 @@ private fun ConnectPanel() {
         return chosen?.let { it.host to it.port }
     }
 
+    val codeFocus = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
+
+    val focusManager = LocalFocusManager.current
+    val syncFocus = remember { FocusRequester() }
+
+    // The button stays enabled and explains what is missing: a disabled button cannot take remote focus
+    fun sync() {
+        if (busy) return
+        val (host, port) = target() ?: run {
+            status = if (address.isNotBlank()) "Адрес должен быть вида 192.168.1.5:40123"
+            else "Выберите устройство из списка или введите его адрес"
+            return
+        }
+        if (code.length != 6) {
+            status = "Введите 6 цифр кода, который показан на другом устройстве"
+            runCatching { codeFocus.requestFocus() }
+            return
+        }
+        busy = true
+        status = null
+        keyboard?.hide()
+        scope.launch {
+            status = try {
+                val merged = withContext(Dispatchers.IO) { Sync.exchange(host, port, code, Repo.prefs.syncData()) }
+                Repo.prefs.applySync(merged)
+                summary(merged)
+            } catch (e: Sync.SyncException) {
+                e.message
+            } catch (e: Exception) {
+                "Не удалось подключиться. Проверьте, что устройства в одной сети и на другом открыт экран с кодом."
+            }
+            busy = false
+        }
+    }
+
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text("Устройства с открытым кодом в этой сети:", style = MaterialTheme.typography.bodyLarge)
         if (peers.isEmpty()) {
@@ -281,49 +366,45 @@ private fun ConnectPanel() {
                     .clip(RoundedCornerShape(12.dp))
                     .background(MaterialTheme.colorScheme.surfaceVariant)
                     .clickable {
+                        // picking a device leads straight to the code
                         chosen = p
                         address = ""
+                        status = null
+                        runCatching { codeFocus.requestFocus() }
                     }
                     .padding(horizontal = 16.dp, vertical = 12.dp)
             )
         }
         OutlinedTextField(
-            value = address,
-            onValueChange = { address = it },
-            singleLine = true,
-            label = { Text("Или адрес вручную, например 192.168.1.5:40123") },
-            modifier = Modifier.fillMaxWidth()
-        )
-        OutlinedTextField(
             value = code,
             onValueChange = { v -> code = v.filter { it.isDigit() }.take(6) },
             singleLine = true,
             label = { Text("Код с другого устройства") },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-            modifier = Modifier.fillMaxWidth()
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword, imeAction = ImeAction.Go),
+            keyboardActions = KeyboardActions(onGo = { sync() }),
+            modifier = Modifier
+                .fillMaxWidth()
+                .focusRequester(codeFocus)
+                .leaveOnArrows(focusManager, down = syncFocus)
         )
         Button(
-            enabled = !busy && code.length == 6 && target() != null,
-            onClick = {
-                val (host, port) = target() ?: return@Button
-                busy = true
-                status = null
-                scope.launch {
-                    status = try {
-                        val merged = withContext(Dispatchers.IO) { Sync.exchange(host, port, code, Repo.prefs.syncData()) }
-                        Repo.prefs.applySync(merged)
-                        summary(merged)
-                    } catch (e: Sync.SyncException) {
-                        e.message
-                    } catch (e: Exception) {
-                        "Не удалось подключиться. Проверьте, что устройства в одной сети и на другом открыт экран с кодом."
-                    }
-                    busy = false
-                }
-            },
+            onClick = { sync() },
             colors = ButtonDefaults.buttonColors(containerColor = AccentColor),
-            modifier = Modifier.focusBorder(RoundedCornerShape(24.dp))
+            modifier = Modifier
+                .focusRequester(syncFocus)
+                .focusBorder(RoundedCornerShape(24.dp), color = Color.White)
         ) { Text(if (busy) "Синхронизируем…" else "Синхронизировать") }
         status?.let { Text(it, style = MaterialTheme.typography.bodyLarge) }
+        // the manual address is the rare case, so it comes last
+        OutlinedTextField(
+            value = address,
+            onValueChange = { address = it },
+            singleLine = true,
+            label = { Text("Если устройство не нашлось — адрес вручную, например 192.168.1.5:40123") },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp)
+                .leaveOnArrows(focusManager, up = syncFocus)
+        )
     }
 }

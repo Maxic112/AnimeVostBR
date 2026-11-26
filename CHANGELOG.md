@@ -4,6 +4,21 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/).
 
+## [1.9.2] - 2026-11-26
+
+### Fixed
+- Android TV: sync could not be started with a remote. The Sync button stayed disabled until the code was
+  typed, and a disabled button takes no focus; the code field kept Up/Down for its cursor, and the focus
+  search from it skipped the button. The button is always reachable now and says what is missing, Down
+  from the code goes to it, and the keyboard's Go key starts the sync.
+- Choosing the found device only put a tick next to it; it now moves to the code field.
+- The focus border of green buttons was green too and could not be seen; it is white on them.
+- Back on the remote in "Show code" or "Connect" returns to the choice instead of leaving the screen.
+
+### Changed
+- On TV the sync screen suggests showing the code on the TV and typing it on the phone. The manual
+  address field moved below the button.
+
 ## [1.9.1] - 2026-11-25
 
 ### Fixed
